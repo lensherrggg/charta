@@ -1,0 +1,14 @@
+{
+  "styles": {
+    "GbBody": {
+      "run": {
+        "size_step": 1
+      }
+    },
+    "GbStrong": {
+      "run": {
+        "east_asia_font": "方正黑体_GBK"
+      }
+    }
+  }
+}

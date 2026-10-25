@@ -1,0 +1,383 @@
+{
+  "schema": 1,
+  "defaults": {
+    "ascii_font": "Times New Roman",
+    "east_asia_font": "方正仿宋_GBK",
+    "size_pt": 16.0
+  },
+  "colors": {
+    "black": "000000",
+    "red": "C00000"
+  },
+  "page": {
+    "width_mm": 210.0,
+    "height_mm": 297.0,
+    "margin_top_mm": 37.0,
+    "margin_bottom_mm": 35.0,
+    "margin_left_mm": 28.0,
+    "margin_right_mm": 26.0,
+    "header_mm": 15.0,
+    "footer_mm": 28.0,
+    "vertical_alignment": "top",
+    "version_record_vertical_alignment": "bottom"
+  },
+  "styles": [
+    {
+      "id": "Normal",
+      "name": "Normal",
+      "run": {
+        "east_asia_font": "方正仿宋_GBK",
+        "size_pt": 16.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbTitle",
+      "name": "General Title",
+      "based_on": "Normal",
+      "paragraph": {
+        "alignment": "center",
+        "line_spacing_pt": 28.0,
+        "space_before_pt": 12.0,
+        "space_after_pt": 12.0,
+        "keep_next": true
+      },
+      "run": {
+        "east_asia_font": "方正小标宋_GBK",
+        "size_pt": 22.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbByline",
+      "name": "General Byline",
+      "based_on": "Normal",
+      "paragraph": {
+        "alignment": "center",
+        "line_spacing_pt": 28.0,
+        "space_after_pt": 12.0,
+        "keep_next": true
+      },
+      "run": {
+        "east_asia_font": "方正楷体_GBK",
+        "size_pt": 16.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbBody",
+      "name": "General Body",
+      "based_on": "Normal",
+      "paragraph": {
+        "alignment": "justify",
+        "line_spacing_pt": 28.0,
+        "indent": {
+          "first_line_chars": 2.0,
+          "first_line_twips": 640
+        }
+      },
+      "run": {
+        "east_asia_font": "方正仿宋_GBK",
+        "size_pt": 16.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbHeading1",
+      "name": "General Heading 1",
+      "based_on": "GbBody",
+      "paragraph": {
+        "alignment": "justify",
+        "line_spacing_pt": 28.0,
+        "keep_next": true,
+        "indent": {
+          "first_line_chars": 2.0,
+          "first_line_twips": 640
+        }
+      },
+      "run": {
+        "east_asia_font": "方正黑体_GBK",
+        "size_pt": 16.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbHeading2",
+      "name": "General Heading 2",
+      "based_on": "GbBody",
+      "paragraph": {
+        "alignment": "justify",
+        "line_spacing_pt": 28.0,
+        "keep_next": true,
+        "indent": {
+          "first_line_chars": 2.0,
+          "first_line_twips": 640
+        }
+      },
+      "run": {
+        "east_asia_font": "方正楷体_GBK",
+        "size_pt": 16.0,
+        "bold": true,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbHeading3",
+      "name": "General Heading 3",
+      "based_on": "GbBody",
+      "paragraph": {
+        "alignment": "justify",
+        "line_spacing_pt": 28.0,
+        "keep_next": true,
+        "indent": {
+          "first_line_chars": 2.0,
+          "first_line_twips": 640
+        }
+      },
+      "run": {
+        "east_asia_font": "方正仿宋_GBK",
+        "size_pt": 16.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbQuote",
+      "name": "General Quote",
+      "based_on": "Normal",
+      "paragraph": {
+        "alignment": "justify",
+        "line_spacing_pt": 28.0,
+        "indent": {
+          "left_chars": 2.0,
+          "right_chars": 2.0,
+          "first_line_chars": 2.0,
+          "first_line_twips": 640
+        }
+      },
+      "run": {
+        "east_asia_font": "方正仿宋_GBK",
+        "size_pt": 16.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbRecipient",
+      "name": "General Recipient",
+      "based_on": "Normal",
+      "paragraph": {
+        "line_spacing_pt": 28.0
+      },
+      "run": {
+        "east_asia_font": "方正仿宋_GBK",
+        "size_pt": 16.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbTableText",
+      "name": "General Table Text",
+      "based_on": "Normal",
+      "paragraph": {
+        "alignment": "center",
+        "line_spacing_pt": 24.0
+      },
+      "run": {
+        "east_asia_font": "方正仿宋_GBK",
+        "size_pt": 14.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbTableHeader",
+      "name": "General Table Header",
+      "based_on": "GbTableText",
+      "paragraph": {
+        "alignment": "center",
+        "line_spacing_pt": 24.0
+      },
+      "run": {
+        "east_asia_font": "方正仿宋_GBK",
+        "size_pt": 14.0,
+        "bold": true,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbTableCaption",
+      "name": "General Table Caption",
+      "based_on": "Normal",
+      "paragraph": {
+        "alignment": "center",
+        "line_spacing_pt": 24.0
+      },
+      "run": {
+        "east_asia_font": "方正楷体_GBK",
+        "size_pt": 14.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbImage",
+      "name": "General Image",
+      "based_on": "Normal",
+      "paragraph": {
+        "alignment": "center"
+      },
+      "run": {
+        "east_asia_font": "方正仿宋_GBK",
+        "size_pt": 16.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbImageCaption",
+      "name": "General Image Caption",
+      "based_on": "Normal",
+      "paragraph": {
+        "alignment": "center",
+        "line_spacing_pt": 24.0,
+        "space_before_pt": 3.0
+      },
+      "run": {
+        "east_asia_font": "方正楷体_GBK",
+        "size_pt": 14.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbStrong",
+      "name": "General Strong",
+      "based_on": "Normal",
+      "run": {
+        "east_asia_font": "方正楷体_GBK",
+        "size_pt": 16.0,
+        "bold": true,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbEmphasis",
+      "name": "General Emphasis",
+      "based_on": "Normal",
+      "run": {
+        "east_asia_font": "方正楷体_GBK",
+        "size_pt": 16.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbPageNumber",
+      "name": "General Page Number",
+      "based_on": "Normal",
+      "paragraph": {
+        "line_spacing_pt": 20.0
+      },
+      "run": {
+        "east_asia_font": "宋体",
+        "size_pt": 14.0,
+        "bold": false,
+        "color": "black"
+      }
+    }
+  ],
+  "numbering": {
+    "heading": {
+      "abstract_id": 1000,
+      "num_id": 1000,
+      "multi_level_type": "multilevel",
+      "levels": [
+        {
+          "level": 0,
+          "format": "chineseCounting",
+          "text": "%1、",
+          "start": 1,
+          "indent_left_twips": 0,
+          "first_line_twips": 640,
+          "suffix": "nothing"
+        },
+        {
+          "level": 1,
+          "format": "chineseCounting",
+          "text": "（%2）",
+          "start": 1,
+          "indent_left_twips": 0,
+          "first_line_twips": 640,
+          "suffix": "nothing"
+        },
+        {
+          "level": 2,
+          "format": "decimal",
+          "text": "%3.",
+          "start": 1,
+          "indent_left_twips": 0,
+          "first_line_twips": 640,
+          "suffix": "nothing"
+        },
+        {
+          "level": 3,
+          "format": "decimal",
+          "text": "（%4）",
+          "start": 1,
+          "indent_left_twips": 0,
+          "first_line_twips": 640,
+          "suffix": "nothing"
+        }
+      ]
+    }
+  },
+  "table": {
+    "width_mm": 156.0,
+    "cell_margin_mm": 1.0,
+    "alignment": "center",
+    "cell_vertical_alignment": "center",
+    "border": {
+      "width_eighths_pt": 4,
+      "color": "black",
+      "space_pt": 0
+    }
+  },
+  "image": {
+    "max_width_mm": 156.0,
+    "max_height_mm": 200.0
+  },
+  "version_record": {
+    "width_mm": 156.0,
+    "columns_mm": [
+      100.0,
+      56.0
+    ],
+    "cell_margin_mm": 0.0,
+    "date_alignment": "right",
+    "border": {
+      "width_eighths_pt": 4,
+      "color": "black",
+      "space_pt": 0
+    }
+  },
+  "footer": {
+    "ascii_font": "SimSun",
+    "prefix": "— ",
+    "suffix": " —",
+    "odd": {
+      "alignment": "right",
+      "indent_chars": 1.0
+    },
+    "even": {
+      "alignment": "left",
+      "indent_chars": 1.0
+    }
+  }
+}
