@@ -8,7 +8,10 @@
 
 - Typst 元数据入口从 YAML front matter 改为主文件顶部的 `#let charta-meta = (...)` 字典字面量；`#let` 在 Typst 编译时没有输出，源文件可直接由 Typst 编译。旧写法会报告 `unsupported_syntax` 并跳过，提示迁移。
 - CLI 默认后端改为 `general`（通用材料）；需要 GB/T 9704 通知时显式传 `--backend gb9704`，`schema` 命令的默认后端同步改为 `general`。
+- `general` 通用材料模板改为以正文第一个一级标题作为大标题：不再读取元数据 `title`（仍提供会报告 `metadata_ignored`），`docProps` 的 `dc:title` 同步取该标题。`#` 使用方正小标宋大标题样式，`##`–`####` 依次对应黑体一级、楷体加粗二级、仿宋三级标题，自动编号相应从 `##` 起步。
+- `general` 中每个 `#` 开启新的标题编号区段：第一个区段复用样式数据的编号定义，之后每个 `#` 分配新的抽象编号/编号实例 ID，使其后 `##` 从 `一、` 重新开始；静态文本回退同样在每个 `#` 处清零计数。单个 `#` 的文档输出不变。
 - GB/T 9704 列表改为四级静态文本序数：第一级 `（1）`、第二级 `①`、第三级 `A.`、第四级 `a.`，第五级起按正文段落渲染；不再生成 Word 项目符号或自动编号。
+- GB/T 9704 标题三级编号 `1.` 与标题文字之间补一个空格（`w:suff=space`），其余级仍不加后缀空格。
 - GB/T 9704 版记改为末节底端对齐，整块置于最后一页版心底部，不再被分页拆开。
 - GB/T 9704 表格支持 `colspan`/`rowspan` 网格合并，不再报告 `table_merge_unsupported`。
 - GB/T 9704 后端样式值外置到 `crates/charta-backend-gb9704/data/styles.json`；渲染流程不再内联字体、字号、颜色、页边距、行距、缩进、边框、表格列宽等样式字面量，静态列表序数按例外保留在流程逻辑中。
@@ -40,6 +43,8 @@
 - `Gb9704Styles` 新增 `from_external_for`（自动识别完整文件/补丁）与 `from_json_with_patch`（补丁应用到指定基础数据）。
 - `charta-docx-kit` 的编号定义新增 `chineseCounting` 格式、`multiLevelType`、`suff`（tab/space/nothing）和首行缩进，可生成规范的标题多级列表。
 - 样式数据新增 `numbering.heading`：抽象编号/编号实例 ID、多级类型、四级 `numFmt`/`lvlText`/起始值/缩进/后缀，按 FR-BE-5 外置，并支持通过 `--styles` 补丁覆盖。
+- 样式数据新增 `numbering.heading.restart`：`enabled` 控制下级标题编号是否随上级变更重置（默认 `true`），`never_from`（2–4）指定从第几级起不再重置；转换时写入 `w:lvlRestart w:val="0"`，可通过 `--styles` 补丁调整。
+- `charta-docx-kit` 的编号层级新增 `restart`，可输出 `w:lvlRestart`（`0` 表示永不重置）。
 - Typst 前端支持按缩进嵌套的 `-` / `+` 列表，映射为 `ListBlock` / `ListItem.children`，不再拍平为正文。
 - Typst 前端支持整行 `#image("path")` 与 `#figure(image(...), caption: [...])`，生成 `ImageBlock` 与题注；非字面量路径显式报告。
 - Typst 前端支持受限 `#table(...)`：`columns` 整数/元组、字面量单元格、`table.header`、`table.cell` 的 `colspan`/`rowspan`/`align`，以及 `#figure(table(...), caption: [...])`；动态参数与未采纳的版式参数逐项告警。

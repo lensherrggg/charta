@@ -21,7 +21,8 @@ pub(crate) struct HeadingNumbers {
 pub(crate) struct NumberingState {
     pub(crate) headings: HeadingNumbers,
     pub(crate) figure: u32,
-    pub(crate) heading_definition_added: bool,
+    pub(crate) heading_num_id: Option<u32>,
+    pub(crate) heading_instances: u32,
     pub(crate) heading_word_reported: bool,
     pub(crate) heading_flattened_reported: bool,
 }
@@ -34,6 +35,10 @@ pub(crate) struct HeadingMarker {
 }
 
 impl HeadingNumbers {
+    pub(crate) fn reset(&mut self) {
+        self.counters = [0; 4];
+    }
+
     pub(crate) fn marker(&mut self, level: u8) -> HeadingMarker {
         let report_static = !self.reported_static;
         self.reported_static = true;
@@ -57,7 +62,7 @@ impl HeadingNumbers {
         let text = match level {
             1 => format!("{}、", chinese_number(number)),
             2 => format!("（{}）", chinese_number(number)),
-            3 => format!("{number}."),
+            3 => format!("{number}. "),
             _ => format!("（{number}）"),
         };
         HeadingMarker {

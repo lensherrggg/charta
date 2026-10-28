@@ -298,6 +298,9 @@
       "abstract_id": 1000,
       "num_id": 1000,
       "multi_level_type": "multilevel",
+      "restart": {
+        "enabled": true
+      },
       "levels": [
         {
           "level": 0,
@@ -324,7 +327,7 @@
           "start": 1,
           "indent_left_twips": 0,
           "first_line_twips": 640,
-          "suffix": "nothing"
+          "suffix": "space"
         },
         {
           "level": 3,

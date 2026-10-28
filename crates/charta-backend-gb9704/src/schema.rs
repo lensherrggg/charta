@@ -27,7 +27,6 @@ pub(crate) fn build_schema(header: bool) -> MetadataSchema {
 
 pub(crate) fn build_general_schema() -> MetadataSchema {
     MetadataSchema::new(vec![
-        FieldSchema::string("title", true).describe("大标题（方正小标宋_GBK）"),
         FieldSchema::string("author", true).describe("姓名"),
         FieldSchema::date("date", true).describe("日期（YYYY-MM-DD）"),
         FieldSchema::string("recipient", false).describe("主送机关，末尾冒号由后端补齐"),

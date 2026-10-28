@@ -155,7 +155,6 @@ Typst 写在 `charta-meta` 的 `_charta` 映射里：
 
 ```typst
 #let charta-meta = (
-  title: "通用材料",
   author: "张三",
   date: "2026-10-25",
   _charta: (
@@ -303,7 +302,7 @@ Typst 没有 front matter。Charta 在主文件的第一个非空行读取原生
 
 0.1.0 落地情况：列表已按 FR-IR-4 记录 `ordered`/`start`，嵌套通过 `ListItem.children` 表达；Markdown 与 Typst 前端都保留列表层级，列表序号不写入 IR。列表仍使用 `（1）` / `①` / `A.` / `a.` 四级静态序数，第五级起回落正文。`charta-docx-kit` 的 `numbering.xml` 构建能力只用于标题，列表不挂 `numPr`。
 
-标题自动编号通过引擎控制元数据 `_charta.heading_numbering: true|false` 显式开启或关闭，并写入未带前端建议的标题节点。默认不自动编号，避免与作者手写的“一、”重复。GB/T 9704 后端对请求自动编号的标题使用 Word 内置多级列表，生成 `一、` / `（一）` / `1.` / `（1）` 四级编号，超过四级不编号并报告 `heading_numbering_flattened`；首次生成报告 `heading_numbering_word`，说明编号由 Word 维护、纯文本抽取不含编号文字。样式数据缺少 `numbering.heading` 时回退为静态文本，并报告 `heading_numbering_static`。IR 的 `auto_number: Option<bool>` 已支持逐标题覆盖，前端语法尚未提供。
+标题自动编号通过引擎控制元数据 `_charta.heading_numbering: true|false` 显式开启或关闭，并写入未带前端建议的标题节点。默认不自动编号，避免与作者手写的“一、”重复。GB/T 9704 后端对请求自动编号的标题使用 Word 内置多级列表，生成 `一、` / `（一）` / `1.` / `（1）` 四级编号，超过四级不编号并报告 `heading_numbering_flattened`；首次生成报告 `heading_numbering_word`，说明编号由 Word 维护、纯文本抽取不含编号文字。通用材料模板的 `#` 是大标题、不编号，`##` 起才对应这四级。下级是否随上级变更重置由 `numbering.heading.restart` 控制：默认按 Word 规则重置，可整体关闭，或指定从第几级起不再重置（写入 `w:lvlRestart w:val="0"`）。样式数据缺少 `numbering.heading` 时回退为静态文本，并报告 `heading_numbering_static`。IR 的 `auto_number: Option<bool>` 已支持逐标题覆盖，前端语法尚未提供。
 
 图片题注不进入标题编号体系：IR 1.1 的 `ImageBlock` 增加可选 `caption` 字段（带默认值的兼容增项），前端把 Markdown 图片 title 写入其中；GB/T 9704 后端按带题注图片的出现顺序生成静态 `图 N`，首次生成报告 `image_caption_static`。无 `caption` 的图片不编号。
 
@@ -359,7 +358,7 @@ pub trait Backend: Send + Sync {
 | 一级标题 | 3 号黑体 |
 | 二级标题 | 3 号楷体 |
 | 三级及以下标题 | 3 号仿宋加粗 |
-| 标题编号（可选） | `_charta.heading_numbering` 开启；Word 内置多级列表生成 `一、` / `（一）` / `1.` / `（1）`；超过四级不编号并告警 |
+| 标题编号（可选） | `_charta.heading_numbering` 开启；Word 内置多级列表生成 `一、` / `（一）` / `1.` / `（1）`；通用材料从 `##` 起编号；超过四级不编号并告警 |
 | 标题 | 2 号小标宋（22 pt），居中 |
 | 发文机关标志 | 36 pt 小标宋，红色 `C00000`，居中 |
 | 发文字号 | 3 号仿宋，居中 |
@@ -402,13 +401,15 @@ pub trait Backend: Send + Sync {
 - 图片：最大显示宽高
 - 版记：总宽、双栏列宽、单元格边距、日期列对齐、框线
 - 页脚：页码字体、`— PAGE —` 前后缀、奇偶页对齐与缩进
-- 标题编号：`numbering.heading` 的抽象编号/编号实例 ID、多级类型、四级 `numFmt`/`lvlText`/起始值、缩进和后缀
+- 标题编号：`numbering.heading` 的抽象编号/编号实例 ID、多级类型、四级 `numFmt`/`lvlText`/起始值、缩进、后缀与重置规则（`restart.enabled` / `restart.never_from`）
 
 渲染流程只按样式 ID 取 `RunConfig` / `TableConfig` / `VersionRecordConfig` / `FooterConfig` 并套用，不再内联样式值。列表静态序数 `（1）`、`①`、`A.`、`a.` 属于 FR-BE-5 的例外，保留在流程逻辑中。标题使用 Word 自动编号时，抽象编号、层级格式、层级文本与缩进已外置到 `numbering.heading`，由 `charta-docx-kit` 写入 `numbering.xml`；样式数据缺少该段时回退静态编号并报告。
 
 加载入口为 `Gb9704Styles::embedded_for` / `from_json_for` / `from_path_for`，按 `StyleSet::Notice` 或 `StyleSet::General` 选择必需样式集；`from_external_for` 自动识别完整文件与补丁，`from_json_with_patch` 把补丁应用到调用方给定的基础数据；`embedded` / `from_json` / `from_path` 是通知样式集的简写。后端可用 `with_styles` / `with_style_file` 接收外部数据，通用材料后端会再次调用 `validate(StyleSet::General)`，防止把通知样式集误用于通用模板。加载时校验 `schema`、重复/缺失样式、`based_on` 指向、颜色引用、必需 `run`、数值范围，并拒绝未知字段和未知枚举值；失败直接返回错误，不做静默回退。样式数据随后端 crate 发布并与后端版本绑定，不进入 IR，引擎核心也不读取或校验该文件。
 
 局部样式覆盖由外部补丁实现：`--styles` 指向的文件若 `styles` 是对象（按样式 ID 索引），就与当前后端的内置数据递归合并；若 `styles` 是数组，则视为完整样式文件并整份替换。合并支持 `styles[*].run`、`styles[*].paragraph`、`defaults`、`numbering`、`page`、`table`、`image`、`version_record`、`footer` 和 `colors`，未写的键保持基础值。
+
+`numbering.heading.restart` 控制下级标题编号的重置：`enabled` 默认 `true`（Word 默认，任意上级递增即重置下级），设为 `false` 时各级都保持连续；`never_from`（2–4）指定从第几级起不再重置，例如 `3` 让 `1.` / `（1）` 跨 `（一）` 连续、`（一）` 仍随 `一、` 重置。转换时按级写入 `w:lvlRestart w:val="0"`（永不重置），未命中的级别不写该元素。`never_from` 与 `enabled: false` 互斥，越界或冲突直接报错。
 
 补丁里的 `styles.<ID>.run.size_step` 按中文字号阶梯 `42 / 36 / 26 / 24 / 22 / 18 / 16 / 15 / 14 / 12 / 10.5 / 9 / 7.5 / 6.5 / 5.5 / 5` 只调整该样式的字号，`1` 为大一号、`-1` 为小一号；也可以用 `run.size_pt` 指定精确值，但二者不能同时出现。`size_step` 以基础样式当前的 `size_pt` 为起点，越界或不在阶梯上返回带样式 ID 的错误。补丁只能引用已有样式，写错 ID 直接报错，避免“改了但没生效”的静默失败。合并结果仍走同一套 `RawFile` 校验、必需样式集校验与 `deny_unknown_fields`，不会绕过后端契约。
 
@@ -436,10 +437,12 @@ pub trait Backend: Send + Sync {
 `general` 与通知共用同一个后端 crate 和 `layout/` 流程，通过 `Gb9704Template::General` 选择。CLI 默认后端是 `general`；库层 `Gb9704Options::default()` 与 `Gb9704Backend` 仍以 `Notice` 为准，需要完整通知时由调用方或 CLI 显式选择。
 
 - 无版头、无版记；页面设置、页码、列表、表格、图片与题注流程复用。
-- 元数据：`title`、`author`、`date` 必填，`recipient` 可选；作者与日期生成标题下的居中署名区。
-- 署名区分两行居中：第一行姓名，第二行 `（YYYY年M月D日）`。姓名恰好两个字符时中间插入一个全角空格；三字及以上原样。GB/T 9704 没有直接规定姓名字距，这是常见排版惯例，单位模板优先。
+- 元数据：`author`、`date` 必填，`recipient` 可选。大标题取自正文第一个一级标题（`#`），元数据不再提供 `title`；若仍提供会报告 `metadata_ignored`。docx 的 `dc:title` 同样取该一级标题。
+- 标题层级整体比通知下移一级：`#` 用大标题样式（方正小标宋_GBK 二号），`##` 用一级标题样式，`###` 用二级标题样式，`####` 及更深用三级标题样式。自动编号相应下移：`#` 不编号，`##`–`#####` 对应 `一、` / `（一）` / `1.` / `（1）`，`######` 及更深报告 `heading_numbering_flattened`。
+- 每个 `#` 开启新的标题编号区段：后端为第一个区段使用样式数据的编号定义，之后每个 `#` 分配新的抽象编号/编号实例 ID（内容沿用同一份定义），使其后 `##` 从 `一、` 重新开始；静态文本回退同样在每个 `#` 处清零各级计数。第二个及以后的 `#` 仍只按大标题渲染，不重复署名区。区段内部的下级重置仍由 `numbering.heading.restart` 控制。
+- 署名区紧跟在第一个一级标题之后、正文之前，分两行居中：第一行姓名，第二行 `（YYYY年M月D日）`。姓名恰好两个字符时中间插入一个全角空格；三字及以上原样。GB/T 9704 没有直接规定姓名字距，这是常见排版惯例，单位模板优先。
 - `recipient` 位于署名区之后、正文之前，左对齐，后端补全角冒号。
-- 样式数据：`data/general-styles.json`。大标题方正小标宋_GBK 二号；一级标题方正黑体_GBK 三号；二级标题（`（一）`）方正楷体_GBK 三号加粗；三级及以下（`1.`、`（1）` 等）方正仿宋_GBK 三号不加粗；正文方正仿宋_GBK 三号。
+- 样式数据：`data/general-styles.json`。大标题方正小标宋_GBK 二号；一级标题（`##`）方正黑体_GBK 三号；二级标题（`###`）方正楷体_GBK 三号加粗；三级及以下（`####` 等）方正仿宋_GBK 三号不加粗；正文方正仿宋_GBK 三号。
 - 行内强调：`strong` 使用 `GbStrong`（方正楷体_GBK 加粗），`emphasis` 使用 `GbEmphasis`（方正楷体_GBK 不加粗、不生成斜体）；通知模板保持原有行为。两套样式 ID 都来自样式数据，不在流程中内联字体名。
 - 样式外部化与局部微调：`GeneralBackend::with_style_file(path)` 按 `StyleSet::General` 加载完整文件或补丁；`--styles` 补丁可以只改 `GbBody` 的字号、`GbStrong` 的字体等单项。例如 `GbBody.run.size_step: 1` 把正文 16pt 提到 18pt，标题和表格保持原值；行内 `strong` 的字号跟随所在段落，字体和加粗取自 `GbStrong`。
 

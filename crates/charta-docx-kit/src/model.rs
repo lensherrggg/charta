@@ -559,6 +559,7 @@ impl NumberingDefinition {
                 first_line_twips: None,
                 suffix: NumberingSuffix::Tab,
                 font: None,
+                restart: None,
             })
             .collect();
         Self::new(abstract_id, num_id, levels)
@@ -576,6 +577,7 @@ impl NumberingDefinition {
                 first_line_twips: None,
                 suffix: NumberingSuffix::Tab,
                 font: None,
+                restart: None,
             })
             .collect();
         Self::new(abstract_id, num_id, levels)
@@ -613,6 +615,9 @@ pub struct NumberingLevel {
     pub first_line_twips: Option<i32>,
     pub suffix: NumberingSuffix,
     pub font: Option<String>,
+    /// 1-based level whose use restarts this level; `Some(0)` never restarts.
+    /// `None` keeps the Word default of restarting after any higher level.
+    pub restart: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

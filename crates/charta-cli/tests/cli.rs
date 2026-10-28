@@ -302,7 +302,7 @@ fn converts_general_template_with_author_and_date() {
     let report_json = dir.join("general.report.json");
     fs::write(
         &input,
-        "---\ntitle: 关于做好近期重点工作的通知\nauthor: 张三\ndate: 2026-10-25\nrecipient: 各部门\n---\n\n# 一、总体要求\n\n请各部门**高度重视**，*抓紧落实*。\n",
+        "---\nauthor: 张三\ndate: 2026-10-25\nrecipient: 各部门\n---\n\n# 关于做好近期重点工作的通知\n\n## 总体要求\n\n请各部门**高度重视**，*抓紧落实*。\n",
     )
     .unwrap();
 

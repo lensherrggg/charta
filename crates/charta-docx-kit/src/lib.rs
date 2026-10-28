@@ -86,6 +86,7 @@ mod tests {
                     first_line_twips: Some(640),
                     suffix: NumberingSuffix::Nothing,
                     font: None,
+                    restart: None,
                 }],
             )
             .multi_level_type(MultiLevelType::Multilevel),

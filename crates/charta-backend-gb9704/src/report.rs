@@ -74,7 +74,7 @@ pub(crate) fn table_rowspan_truncated(source: &SourceSpan) -> Issue {
 
 pub(crate) fn ignored_metadata(field: &str, reason: &str) -> Issue {
     Issue::render_warning(
-        format!("元数据 `{field}` 未被通知后端使用"),
+        format!("元数据 `{field}` 未被当前后端使用"),
         "metadata_ignored",
         Some(reason.to_owned()),
         None,

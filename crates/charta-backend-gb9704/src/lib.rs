@@ -304,12 +304,19 @@ impl Backend for GeneralBackend {
         docx.page = self.styles.page().setup();
         docx.styles = self.styles.stylesheet();
         docx.core = CoreProperties {
-            title: layout::string_field(metadata, "title").map(str::to_owned),
+            title: layout::body::first_title(&request.document.blocks),
             creator: layout::string_field(metadata, "author").map(str::to_owned),
             subject: None,
             created: None,
         };
         docx.footers = layout::footer::build(&self.styles);
+
+        if metadata.get("title").is_some() {
+            issues.push(report::ignored_metadata(
+                "title",
+                "通用材料以一级标题作为大标题，元数据 title 不参与渲染",
+            ));
+        }
 
         layout::body::render_general(
             &mut docx,

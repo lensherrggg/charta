@@ -7,8 +7,8 @@ use charta::{
     TableBlock, TableCell as IrTableCell,
 };
 use charta_docx_kit::{
-    Alignment as DocxAlignment, Docx, Image, NumberingRef, Paragraph, Run, Table, TableBorders,
-    TableCell, TableRow, VMerge,
+    Alignment as DocxAlignment, Docx, Image, NumberingDefinition, NumberingRef, Paragraph, Run,
+    Table, TableBorders, TableCell, TableRow, VMerge,
 };
 
 use crate::layout::text::{build_runs, plain_paragraph, styled_paragraph, styled_run};
@@ -22,6 +22,7 @@ use crate::styles::{
     STYLE_TABLE_TEXT, STYLE_TITLE,
 };
 use crate::Gb9704Options;
+use crate::Gb9704Template;
 
 pub(crate) fn render_main(
     docx: &mut Docx,
@@ -42,7 +43,16 @@ pub(crate) fn render_main(
     }
 
     let mut numbers = NumberingState::default();
-    render_blocks(blocks, docx, options, styles, issues, &mut numbers, false);
+    render_blocks(
+        blocks,
+        docx,
+        options,
+        styles,
+        issues,
+        &mut numbers,
+        false,
+        Gb9704Template::Notice,
+    );
 
     if let Some(attachments) = list_field(metadata, "attachments") {
         let mut text = String::from("附件：");
@@ -92,9 +102,61 @@ pub(crate) fn render_general(
     styles: &Gb9704Styles,
     issues: &mut Vec<Issue>,
 ) {
-    let title = string_field(metadata, "title").unwrap_or_default();
-    docx.add_paragraph(plain_paragraph(title, STYLE_TITLE, styles.run(STYLE_TITLE)));
+    let mut numbers = NumberingState::default();
+    let title_index = blocks
+        .iter()
+        .position(|block| matches!(&block.kind, BlockKind::Heading { level: 1, .. }));
+    match title_index {
+        Some(index) => {
+            render_blocks(
+                &blocks[..index],
+                docx,
+                options,
+                styles,
+                issues,
+                &mut numbers,
+                false,
+                Gb9704Template::General,
+            );
+            render_blocks(
+                &blocks[index..=index],
+                docx,
+                options,
+                styles,
+                issues,
+                &mut numbers,
+                false,
+                Gb9704Template::General,
+            );
+            add_general_preface(docx, metadata, styles);
+            render_blocks(
+                &blocks[index + 1..],
+                docx,
+                options,
+                styles,
+                issues,
+                &mut numbers,
+                false,
+                Gb9704Template::General,
+            );
+        }
+        None => {
+            add_general_preface(docx, metadata, styles);
+            render_blocks(
+                blocks,
+                docx,
+                options,
+                styles,
+                issues,
+                &mut numbers,
+                false,
+                Gb9704Template::General,
+            );
+        }
+    }
+}
 
+fn add_general_preface(docx: &mut Docx, metadata: &Metadata, styles: &Gb9704Styles) {
     let author = string_field(metadata, "author").unwrap_or_default();
     let date = string_field(metadata, "date").unwrap_or_default();
     let byline = if author.trim().is_empty() {
@@ -117,9 +179,18 @@ pub(crate) fn render_general(
             styles.run(STYLE_RECIPIENT),
         ));
     }
+}
 
-    let mut numbers = NumberingState::default();
-    render_blocks(blocks, docx, options, styles, issues, &mut numbers, false);
+pub(crate) fn first_title(blocks: &[Block]) -> Option<String> {
+    blocks.iter().find_map(|block| match &block.kind {
+        BlockKind::Heading {
+            level: 1, content, ..
+        } => {
+            let text: String = content.iter().map(|run| run.text.as_str()).collect();
+            (!text.trim().is_empty()).then_some(text)
+        }
+        _ => None,
+    })
 }
 
 pub(crate) fn spaced_name(name: &str) -> String {
@@ -132,6 +203,7 @@ pub(crate) fn spaced_name(name: &str) -> String {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_blocks(
     blocks: &[Block],
     docx: &mut Docx,
@@ -140,6 +212,7 @@ fn render_blocks(
     issues: &mut Vec<Issue>,
     numbers: &mut NumberingState,
     quote: bool,
+    template: Gb9704Template,
 ) {
     for block in blocks {
         if let Determinism::NonDeterministic { reason, impact } = &block.determinism {
@@ -154,13 +227,18 @@ fn render_blocks(
                 let (style_id, style) = if quote {
                     (STYLE_QUOTE, styles.run(STYLE_QUOTE))
                 } else {
-                    heading_style(*level, styles)
+                    heading_style(*level, styles, template)
                 };
+                if matches!(template, Gb9704Template::General) && *level == 1 {
+                    numbers.heading_num_id = None;
+                    numbers.headings.reset();
+                }
                 let mut paragraph =
                     styled_paragraph(style_id, content, style, options, styles, issues);
                 if matches!(auto_number, Some(true)) {
                     apply_heading_numbering(
                         *level,
+                        template,
                         &block.source,
                         &mut paragraph,
                         style,
@@ -198,12 +276,12 @@ fn render_blocks(
                     &mut numbers.figure,
                 );
             }
-            BlockKind::Quote { blocks } => {
-                render_blocks(blocks, docx, options, styles, issues, numbers, true)
-            }
-            BlockKind::Extended { blocks, .. } => {
-                render_blocks(blocks, docx, options, styles, issues, numbers, quote)
-            }
+            BlockKind::Quote { blocks } => render_blocks(
+                blocks, docx, options, styles, issues, numbers, true, template,
+            ),
+            BlockKind::Extended { blocks, .. } => render_blocks(
+                blocks, docx, options, styles, issues, numbers, quote, template,
+            ),
         }
     }
 }
@@ -211,6 +289,7 @@ fn render_blocks(
 #[allow(clippy::too_many_arguments)]
 fn apply_heading_numbering(
     level: u8,
+    template: Gb9704Template,
     source: &SourceSpan,
     paragraph: &mut Paragraph,
     style: &RunConfig,
@@ -219,14 +298,22 @@ fn apply_heading_numbering(
     issues: &mut Vec<Issue>,
     numbers: &mut NumberingState,
 ) {
-    if !(1..=4).contains(&level) {
+    let offset = match template {
+        Gb9704Template::Notice => 0,
+        Gb9704Template::General => 1,
+    };
+    if level <= offset {
+        return;
+    }
+    let numbering_level = level - offset;
+    if !(1..=4).contains(&numbering_level) {
         if styles.heading_numbering().is_some() {
             if !numbers.heading_flattened_reported {
                 numbers.heading_flattened_reported = true;
                 issues.push(report::heading_numbering_flattened(source));
             }
         } else {
-            let marker = numbers.headings.marker(level);
+            let marker = numbers.headings.marker(numbering_level);
             if marker.report_static {
                 issues.push(report::heading_numbering_static(source));
             }
@@ -238,20 +325,27 @@ fn apply_heading_numbering(
     }
 
     if let Some(definition) = styles.heading_numbering() {
-        if !numbers.heading_definition_added {
-            docx.add_numbering(definition.clone());
-            numbers.heading_definition_added = true;
-        }
+        let num_id = match numbers.heading_num_id {
+            Some(num_id) => num_id,
+            None => {
+                let instance = heading_instance(definition, numbers.heading_instances);
+                let num_id = instance.num_id;
+                numbers.heading_instances += 1;
+                numbers.heading_num_id = Some(num_id);
+                docx.add_numbering(instance);
+                num_id
+            }
+        };
         paragraph.formatting.numbering = Some(NumberingRef {
-            num_id: definition.num_id,
-            level: (level - 1) as u32,
+            num_id,
+            level: (numbering_level - 1) as u32,
         });
         if !numbers.heading_word_reported {
             numbers.heading_word_reported = true;
             issues.push(report::heading_numbering_word(source));
         }
     } else {
-        let marker = numbers.headings.marker(level);
+        let marker = numbers.headings.marker(numbering_level);
         if marker.report_static {
             issues.push(report::heading_numbering_static(source));
         }
@@ -294,13 +388,30 @@ fn render_list(
     }
 }
 
-fn heading_style(level: u8, styles: &Gb9704Styles) -> (&'static str, &RunConfig) {
-    let style_id = match level {
-        1 => STYLE_HEADING1,
-        2 => STYLE_HEADING2,
-        _ => STYLE_HEADING3,
+fn heading_style(
+    level: u8,
+    styles: &Gb9704Styles,
+    template: Gb9704Template,
+) -> (&'static str, &RunConfig) {
+    let style_id = match (template, level) {
+        (Gb9704Template::General, 1) => STYLE_TITLE,
+        (Gb9704Template::General, 2) => STYLE_HEADING1,
+        (Gb9704Template::General, 3) => STYLE_HEADING2,
+        (Gb9704Template::General, _) => STYLE_HEADING3,
+        (Gb9704Template::Notice, 1) => STYLE_HEADING1,
+        (Gb9704Template::Notice, 2) => STYLE_HEADING2,
+        (Gb9704Template::Notice, _) => STYLE_HEADING3,
     };
     (style_id, styles.run(style_id))
+}
+
+fn heading_instance(base: &NumberingDefinition, index: u32) -> NumberingDefinition {
+    let mut instance = base.clone();
+    if index > 0 {
+        instance.abstract_id += index;
+        instance.num_id += index;
+    }
+    instance
 }
 
 fn render_image(

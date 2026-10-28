@@ -725,6 +725,19 @@ fn resolve_heading_numbering(
     if raw.levels.is_empty() {
         return Err(invalid("numbering.heading.levels 不能为空"));
     }
+    let restart_setting = raw.restart.unwrap_or_default();
+    if let Some(never_from) = restart_setting.never_from {
+        if !restart_setting.enabled {
+            return Err(invalid(
+                "numbering.heading.restart.never_from 只在 restart.enabled 为 true 时有效",
+            ));
+        }
+        if !(2..=4).contains(&never_from) {
+            return Err(invalid(
+                "numbering.heading.restart.never_from 必须在 2 到 4 之间",
+            ));
+        }
+    }
     let multi_level_type = parse_multi_level_type(&raw.multi_level_type)?;
     let mut levels = Vec::with_capacity(raw.levels.len());
     for raw_level in raw.levels {
@@ -767,6 +780,13 @@ fn resolve_heading_numbering(
             }
             font => font,
         };
+        let one_based = raw_level.level + 1;
+        let resets = restart_setting.enabled
+            && match restart_setting.never_from {
+                Some(from) => one_based < u32::from(from),
+                None => true,
+            };
+        let restart_override = (one_based >= 2 && !resets).then_some(0);
         levels.push(NumberingLevel {
             level: raw_level.level,
             format: parse_number_format(&raw_level.format)?,
@@ -777,6 +797,7 @@ fn resolve_heading_numbering(
             first_line_twips: raw_level.first_line_twips,
             suffix: parse_numbering_suffix(&raw_level.suffix)?,
             font,
+            restart: restart_override,
         });
     }
     levels.sort_by_key(|level| level.level);
@@ -906,7 +927,30 @@ struct RawHeadingNumbering {
     num_id: u32,
     #[serde(default = "default_heading_multi_level_type")]
     multi_level_type: String,
+    #[serde(default)]
+    restart: Option<RawHeadingRestart>,
     levels: Vec<RawNumberingLevel>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawHeadingRestart {
+    #[serde(default = "default_restart_enabled")]
+    enabled: bool,
+    never_from: Option<u8>,
+}
+
+impl Default for RawHeadingRestart {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            never_from: None,
+        }
+    }
+}
+
+fn default_restart_enabled() -> bool {
+    true
 }
 
 #[derive(Debug, Deserialize)]

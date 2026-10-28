@@ -609,10 +609,16 @@ fn numbering_xml(definitions: &[NumberingDefinition]) -> String {
         ));
         for level in &definition.levels {
             xml.push_str(&format!(
-                "<w:lvl w:ilvl=\"{}\"><w:start w:val=\"{}\"/><w:numFmt w:val=\"{}\"/><w:suff w:val=\"{}\"/><w:lvlText w:val=\"{}\"/><w:lvlJc w:val=\"left\"/><w:pPr><w:ind {}/></w:pPr>",
+                "<w:lvl w:ilvl=\"{}\"><w:start w:val=\"{}\"/><w:numFmt w:val=\"{}\"/>",
                 level.level,
                 level.start,
-                level.format.xml_value(),
+                level.format.xml_value()
+            ));
+            if let Some(restart) = level.restart {
+                xml.push_str(&format!("<w:lvlRestart w:val=\"{restart}\"/>"));
+            }
+            xml.push_str(&format!(
+                "<w:suff w:val=\"{}\"/><w:lvlText w:val=\"{}\"/><w:lvlJc w:val=\"left\"/><w:pPr><w:ind {}/></w:pPr>",
                 level.suffix.xml_value(),
                 escape_attr(&level.text),
                 numbering_indent(level)

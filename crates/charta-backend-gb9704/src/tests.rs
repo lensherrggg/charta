@@ -336,7 +336,6 @@ fn image_captions_are_numbered_and_reported() {
 
 fn general_metadata() -> Metadata {
     let mut metadata = Metadata::new();
-    metadata.insert("title", "关于做好近期重点工作的通知");
     metadata.insert("author", "张三");
     metadata.insert("date", "2026-10-25");
     metadata.insert("recipient", "各部门");
@@ -352,9 +351,14 @@ fn style_block<'a>(styles: &'a str, id: &str) -> &'a str {
 }
 
 #[test]
-fn general_template_renders_title_byline_and_recipient() {
+fn general_template_renders_heading_levels_and_preface() {
     let document = Document::new(FrontendId::Markdown, general_metadata()).with_blocks(vec![
-        Block::heading(1, vec![Inline::text("一、总体要求", span())], span()),
+        Block::heading(
+            1,
+            vec![Inline::text("关于做好近期重点工作的通知", span())],
+            span(),
+        ),
+        Block::heading(2, vec![Inline::text("总体要求", span())], span()),
         Block::paragraph(
             vec![
                 Inline::text("请各部门", span()),
@@ -365,7 +369,9 @@ fn general_template_renders_title_byline_and_recipient() {
             ],
             span(),
         ),
-        Block::heading(2, vec![Inline::text("（一）加强统筹", span())], span()),
+        Block::heading(3, vec![Inline::text("加强统筹", span())], span()),
+        Block::heading(4, vec![Inline::text("明确责任", span())], span()),
+        Block::heading(5, vec![Inline::text("细化措施", span())], span()),
     ]);
     let output = GeneralBackend::new()
         .render(RenderRequest {
@@ -375,18 +381,28 @@ fn general_template_renders_title_byline_and_recipient() {
         .unwrap();
     let body = part(&output.docx, "word/document.xml");
     let styles = part(&output.docx, "word/styles.xml");
+    let core = part(&output.docx, "docProps/core.xml");
     let text = body_text(&body);
+
+    assert!(core.contains("<dc:title>关于做好近期重点工作的通知</dc:title>"));
+    let title_style = format!("<w:pStyle w:val=\"{STYLE_TITLE}\"/>");
+    assert!(body.contains(&title_style));
+    assert_eq!(body.matches("<w:pStyle w:val=\"GbHeading1\"/>").count(), 1);
+    assert_eq!(body.matches("<w:pStyle w:val=\"GbHeading2\"/>").count(), 1);
+    assert_eq!(body.matches("<w:pStyle w:val=\"GbHeading3\"/>").count(), 2);
 
     assert!(text.contains("张　三"));
     assert!(text.contains("（2026年10月25日）"));
     let name_at = body.find("张　三").unwrap();
     let break_at = body[name_at..].find("<w:br/>").unwrap() + name_at;
     let date_at = body.find("（2026年10月25日）").unwrap();
-    assert!(name_at < break_at && break_at < date_at);
+    let title_at = body.find("关于做好近期重点工作的通知").unwrap();
+    let section_at = body.find("总体要求").unwrap();
+    assert!(title_at < name_at && name_at < break_at && break_at < date_at);
+    assert!(date_at < section_at);
     assert!(text.contains("各部门："));
     assert!(!body.contains("抄送"));
     assert!(!body.contains("<w:type w:val=\"nextPage\"/>"));
-    assert!(body.contains("方正楷体_GBK"));
 
     for font in [
         "方正小标宋_GBK",
@@ -396,6 +412,8 @@ fn general_template_renders_title_byline_and_recipient() {
     ] {
         assert!(styles.contains(font), "missing font {font}");
     }
+    let heading1 = style_block(&styles, "GbHeading1");
+    assert!(heading1.contains("方正黑体_GBK"));
     let heading2 = style_block(&styles, "GbHeading2");
     assert!(heading2.contains("方正楷体_GBK"));
     assert!(heading2.contains("w:b/>"));
@@ -429,6 +447,137 @@ fn general_schema_requires_author_and_date() {
     metadata.fields.remove("date");
     let issues = GeneralBackend::new().schema().validate(&metadata);
     assert_eq!(issues.len(), 2);
+}
+
+#[test]
+fn general_schema_has_no_title_field() {
+    let backend = GeneralBackend::new();
+    let schema = backend.schema();
+    let names: Vec<&str> = schema
+        .fields
+        .iter()
+        .map(|field| field.name.as_str())
+        .collect();
+    assert_eq!(names, ["author", "date", "recipient"]);
+}
+
+#[test]
+fn general_reports_an_ignored_title_metadata() {
+    let mut metadata = general_metadata();
+    metadata.insert("title", "旧标题");
+    let document = Document::new(FrontendId::Markdown, metadata);
+    let output = GeneralBackend::new()
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let text = body_text(&part(&output.docx, "word/document.xml"));
+    assert!(!text.contains("旧标题"));
+    assert!(output.issues.iter().any(|issue| matches!(
+        &issue.details,
+        IssueDetails::RenderWarning { code, .. } if code == "metadata_ignored"
+    )));
+}
+
+#[test]
+fn general_heading_numbering_shifts_one_level_down() {
+    let document = Document::new(FrontendId::Markdown, general_metadata()).with_blocks(vec![
+        Block::heading(1, vec![Inline::text("通知标题", span())], span()).with_auto_number(true),
+        Block::heading(2, vec![Inline::text("总体要求", span())], span()).with_auto_number(true),
+        Block::heading(3, vec![Inline::text("加强统筹", span())], span()).with_auto_number(true),
+        Block::heading(4, vec![Inline::text("明确责任", span())], span()).with_auto_number(true),
+        Block::heading(5, vec![Inline::text("细化措施", span())], span()).with_auto_number(true),
+        Block::heading(6, vec![Inline::text("末端", span())], span()).with_auto_number(true),
+    ]);
+    let output = GeneralBackend::new()
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let body = part(&output.docx, "word/document.xml");
+
+    assert_eq!(body.matches("<w:numPr>").count(), 4);
+    assert!(body.contains("<w:ilvl w:val=\"0\"/><w:numId w:val=\"1000\"/>"));
+    assert!(body.contains("<w:ilvl w:val=\"3\"/><w:numId w:val=\"1000\"/>"));
+    assert!(!body.contains("<w:ilvl w:val=\"4\"/>"));
+    assert_eq!(
+        output
+            .issues
+            .iter()
+            .filter(|issue| matches!(
+                &issue.details,
+                IssueDetails::RenderWarning { code, .. } if code == "heading_numbering_word"
+            ))
+            .count(),
+        1
+    );
+    assert_eq!(
+        output
+            .issues
+            .iter()
+            .filter(|issue| matches!(
+                &issue.details,
+                IssueDetails::RenderWarning { code, .. } if code == "heading_numbering_flattened"
+            ))
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn general_heading_numbering_restarts_after_each_title() {
+    let document = Document::new(FrontendId::Markdown, general_metadata()).with_blocks(vec![
+        Block::heading(1, vec![Inline::text("第一份材料", span())], span()).with_auto_number(true),
+        Block::heading(2, vec![Inline::text("总体要求", span())], span()).with_auto_number(true),
+        Block::heading(3, vec![Inline::text("加强统筹", span())], span()).with_auto_number(true),
+        Block::heading(1, vec![Inline::text("第二份材料", span())], span()).with_auto_number(true),
+        Block::heading(2, vec![Inline::text("具体要求", span())], span()).with_auto_number(true),
+        Block::heading(3, vec![Inline::text("明确责任", span())], span()).with_auto_number(true),
+    ]);
+    let output = GeneralBackend::new()
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let body = part(&output.docx, "word/document.xml");
+    let numbering = part(&output.docx, "word/numbering.xml");
+
+    assert_eq!(body.matches("<w:numPr>").count(), 4);
+    assert!(body.contains("<w:ilvl w:val=\"0\"/><w:numId w:val=\"1000\"/>"));
+    assert!(body.contains("<w:ilvl w:val=\"1\"/><w:numId w:val=\"1000\"/>"));
+    assert!(body.contains("<w:ilvl w:val=\"0\"/><w:numId w:val=\"1001\"/>"));
+    assert!(body.contains("<w:ilvl w:val=\"1\"/><w:numId w:val=\"1001\"/>"));
+    assert!(numbering.contains("w:abstractNumId=\"1000\""));
+    assert!(numbering.contains("w:abstractNumId=\"1001\""));
+    assert!(numbering.contains("<w:num w:numId=\"1001\"><w:abstractNumId w:val=\"1001\"/></w:num>"));
+}
+
+#[test]
+fn general_static_numbering_resets_after_each_title() {
+    let mut data: serde_json::Value =
+        serde_json::from_str(include_str!("../data/general-styles.json")).unwrap();
+    data.as_object_mut().unwrap().remove("numbering");
+    let styles = Gb9704Styles::from_json_for(&data.to_string(), StyleSet::General).unwrap();
+    let backend = GeneralBackend::with_styles(styles);
+    let document = Document::new(FrontendId::Markdown, general_metadata()).with_blocks(vec![
+        Block::heading(1, vec![Inline::text("第一份材料", span())], span()).with_auto_number(true),
+        Block::heading(2, vec![Inline::text("总体要求", span())], span()).with_auto_number(true),
+        Block::heading(1, vec![Inline::text("第二份材料", span())], span()).with_auto_number(true),
+        Block::heading(2, vec![Inline::text("具体要求", span())], span()).with_auto_number(true),
+    ]);
+    let output = backend
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let text = body_text(&part(&output.docx, "word/document.xml"));
+    assert!(text.contains("一、总体要求"));
+    assert!(text.contains("一、具体要求"));
+    assert_eq!(text.matches("一、").count(), 2);
 }
 
 #[test]
@@ -658,6 +807,7 @@ fn heading_numbering_uses_word_multilevel_list() {
     assert!(numbering.contains("w:lvlText w:val=\"%3.\""));
     assert!(numbering.contains("w:lvlText w:val=\"（%4）\""));
     assert!(numbering.contains("w:suff w:val=\"nothing\""));
+    assert!(numbering.contains("w:suff w:val=\"space\""));
 
     assert_eq!(
         output
@@ -742,6 +892,7 @@ fn heading_numbering_falls_back_to_static_without_a_definition() {
 
     assert!(text.contains("一、范围"));
     assert!(text.contains("（二）再对象"));
+    assert!(text.contains("1. 细则"));
     assert!(!body.contains("<w:numPr"));
     assert_eq!(
         output
@@ -1097,6 +1248,94 @@ fn rejects_invalid_heading_numbering_data() {
     .unwrap_err()
     .to_string();
     assert!(bad_placeholder.contains("占位符"), "{bad_placeholder}");
+
+    let bad_restart_level = Gb9704Styles::from_json(&changed_style_json(|data| {
+        data["numbering"]["heading"]["restart"]["never_from"] = serde_json::json!(5);
+    }))
+    .unwrap_err()
+    .to_string();
+    assert!(
+        bad_restart_level.contains("never_from"),
+        "{bad_restart_level}"
+    );
+
+    let conflicting_restart = Gb9704Styles::from_json(&changed_style_json(|data| {
+        data["numbering"]["heading"]["restart"]["enabled"] = serde_json::json!(false);
+        data["numbering"]["heading"]["restart"]["never_from"] = serde_json::json!(3);
+    }))
+    .unwrap_err()
+    .to_string();
+    assert!(
+        conflicting_restart.contains("never_from"),
+        "{conflicting_restart}"
+    );
+}
+
+#[test]
+fn heading_numbering_can_disable_restarts() {
+    let styles = Gb9704Styles::from_json(&changed_style_json(|data| {
+        data["numbering"]["heading"]["restart"]["enabled"] = serde_json::json!(false);
+    }))
+    .unwrap();
+    let backend = Gb9704Backend::with_styles(Gb9704Options::default(), styles);
+    let document = Document::new(FrontendId::Markdown, metadata()).with_blocks(numbered_headings());
+    let output = backend
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let numbering = part(&output.docx, "word/numbering.xml");
+    assert_eq!(numbering.matches("<w:lvlRestart w:val=\"0\"/>").count(), 3);
+}
+
+#[test]
+fn heading_numbering_stops_restarting_from_a_level() {
+    let styles = Gb9704Styles::from_json(&changed_style_json(|data| {
+        data["numbering"]["heading"]["restart"]["never_from"] = serde_json::json!(3);
+    }))
+    .unwrap();
+    let backend = Gb9704Backend::with_styles(Gb9704Options::default(), styles);
+    let document = Document::new(FrontendId::Markdown, metadata()).with_blocks(numbered_headings());
+    let output = backend
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let numbering = part(&output.docx, "word/numbering.xml");
+    assert_eq!(numbering.matches("<w:lvlRestart w:val=\"0\"/>").count(), 2);
+    let level2 = numbering
+        .split("<w:lvl w:ilvl=\"1\">")
+        .nth(1)
+        .unwrap()
+        .split("</w:lvl>")
+        .next()
+        .unwrap();
+    assert!(!level2.contains("lvlRestart"));
+}
+
+#[test]
+fn style_patches_can_change_restart_settings() {
+    let styles = patch_general_styles(
+        r#"{ "numbering": { "heading": { "restart": { "never_from": 4 } } } }"#,
+    )
+    .unwrap();
+    let backend = GeneralBackend::with_styles(styles);
+    let document = Document::new(FrontendId::Markdown, general_metadata()).with_blocks(vec![
+        Block::heading(1, vec![Inline::text("标题", span())], span()).with_auto_number(true),
+        Block::heading(2, vec![Inline::text("一级", span())], span()).with_auto_number(true),
+        Block::heading(3, vec![Inline::text("二级", span())], span()).with_auto_number(true),
+        Block::heading(4, vec![Inline::text("三级", span())], span()).with_auto_number(true),
+    ]);
+    let output = backend
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let numbering = part(&output.docx, "word/numbering.xml");
+    assert_eq!(numbering.matches("<w:lvlRestart w:val=\"0\"/>").count(), 1);
 }
 
 #[test]
