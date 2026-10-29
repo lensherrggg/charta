@@ -11,6 +11,7 @@ use charta_docx_kit::{
     PageSetup, Paragraph, Run, SectionBreak, Table, TableBorders, TableCell, TableRow, VMerge,
 };
 
+use crate::layout::minutes::render_attendance;
 use crate::layout::text::{build_runs, plain_paragraph, styled_paragraph, styled_run};
 use crate::layout::{chinese_date, list_field, string_field, with_colon, with_parentheses};
 use crate::numbering::{figure_label, list_marker, max_list_depth, NumberingState};
@@ -86,20 +87,7 @@ pub(crate) fn render_main(
     }
 
     if let Some(attachments) = list_field(metadata, "attachments") {
-        let mut text = String::from("附件：");
-        for (index, name) in attachments.iter().enumerate() {
-            if index == 0 {
-                text.push_str(&format!("1. {name}"));
-            } else {
-                text.push('\n');
-                text.push_str(&format!("{}. {name}", index + 1));
-            }
-        }
-        docx.add_paragraph(plain_paragraph(
-            &text,
-            STYLE_ATTACHMENT,
-            styles.run(STYLE_ATTACHMENT),
-        ));
+        add_attachments(docx, &attachments, styles);
     }
 
     let issuer = string_field(metadata, "issuer").unwrap_or_default();
@@ -115,6 +103,50 @@ pub(crate) fn render_main(
             styles.run(STYLE_NOTE),
         ));
     }
+}
+
+/// 纪要 has no recipient and no signature block: 标志, title, body, then the
+/// attendance lists and 版记.
+pub(crate) fn render_minutes(
+    docx: &mut Docx,
+    metadata: &Metadata,
+    blocks: &[Block],
+    options: &DocOptions,
+    styles: &DocStyles,
+    issues: &mut Vec<Issue>,
+) {
+    let mut numbers = NumberingState::default();
+    render_blocks(
+        blocks,
+        docx,
+        options,
+        styles,
+        issues,
+        &mut numbers,
+        false,
+        DocTemplate::Notice,
+    );
+    if let Some(attachments) = list_field(metadata, "attachments") {
+        add_attachments(docx, &attachments, styles);
+    }
+    render_attendance(docx, metadata, styles);
+}
+
+fn add_attachments(docx: &mut Docx, attachments: &[String], styles: &DocStyles) {
+    let mut text = String::from("附件：");
+    for (index, name) in attachments.iter().enumerate() {
+        if index == 0 {
+            text.push_str(&format!("1. {name}"));
+        } else {
+            text.push('\n');
+            text.push_str(&format!("{}. {name}", index + 1));
+        }
+    }
+    docx.add_paragraph(plain_paragraph(
+        &text,
+        STYLE_ATTACHMENT,
+        styles.run(STYLE_ATTACHMENT),
+    ));
 }
 
 fn add_recipient(docx: &mut Docx, metadata: &Metadata, styles: &DocStyles) {

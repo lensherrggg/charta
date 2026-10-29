@@ -26,6 +26,7 @@ pub(crate) const STYLE_SIGNER: &str = "GbSigner";
 pub(crate) const STYLE_RED_LINE: &str = "GbRedLine";
 pub(crate) const STYLE_TITLE: &str = "GbTitle";
 pub(crate) const STYLE_RECIPIENT: &str = "GbRecipient";
+pub(crate) const STYLE_ATTENDANCE: &str = "GbAttendance";
 pub(crate) const STYLE_BODY: &str = "GbBody";
 pub(crate) const STYLE_HEADING1: &str = "GbHeading1";
 pub(crate) const STYLE_HEADING2: &str = "GbHeading2";
@@ -63,6 +64,7 @@ const REQUIRED_STYLES: &[&str] = &[
     STYLE_RED_LINE,
     STYLE_TITLE,
     STYLE_RECIPIENT,
+    STYLE_ATTENDANCE,
     STYLE_BODY,
     STYLE_HEADING1,
     STYLE_HEADING2,
@@ -1296,18 +1298,24 @@ impl RawParagraph {
 #[serde(deny_unknown_fields)]
 struct RawIndent {
     left_chars: Option<f32>,
+    left_twips: Option<i32>,
     right_chars: Option<f32>,
     first_line_chars: Option<f32>,
     first_line_twips: Option<i32>,
+    hanging_chars: Option<f32>,
+    hanging_twips: Option<i32>,
 }
 
 impl RawIndent {
     fn resolve(self) -> Indent {
         Indent {
             left_chars: self.left_chars,
+            left_twips: self.left_twips,
             right_chars: self.right_chars,
             first_line_chars: self.first_line_chars,
             first_line_twips: self.first_line_twips,
+            hanging_chars: self.hanging_chars,
+            hanging_twips: self.hanging_twips,
             ..Indent::default()
         }
     }

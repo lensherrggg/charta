@@ -350,6 +350,9 @@ pub enum LineSpacing {
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Indent {
     pub left_chars: Option<f32>,
+    /// Left indent in twips. Word needs this alongside `left_chars` for
+    /// hanging-indent combinations to take effect.
+    pub left_twips: Option<i32>,
     pub right_chars: Option<f32>,
     /// Right indent in twips. Word needs this alongside `right_chars` when the
     /// char-unit value is reset to zero.

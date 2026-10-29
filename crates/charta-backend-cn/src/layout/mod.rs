@@ -8,6 +8,7 @@ pub(crate) mod body;
 pub(crate) mod cover;
 pub(crate) mod footer;
 pub(crate) mod header;
+pub(crate) mod minutes;
 pub(crate) mod record;
 pub(crate) mod text;
 pub(crate) mod toc;

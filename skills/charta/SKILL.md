@@ -62,6 +62,7 @@ Windows 下可执行文件是 `charta.exe`，参数相同。
 | 体裁 | 后端 | 必填元数据 | 说明 |
 |---|---|---|---|
 | 正式通知 | `gb9704` | `doc_number`、`issuer`、`date` | 首个 `#` 即大标题；版头、版记、28 磅行距、页码；`organization`/`recipient`/`cc`/`attachments` 等可选；填 `signer` 改按上行文排版（发文字号居左空一字，签发人居右空一字） |
+| 会议纪要 | `gb9704-minutes` | `meeting`、`issuing_office`、`issuing_date` | 红色“会议名称纪要”标志；`attendees`/`absentees`/`observers` 出出席/请假/列席名单；无发文字号、署名、印章；版记为“分送” |
 | 一般材料 | `general` | 无 | 首个 `#` 即大标题；`author`、`date`、`recipient` 都可选 |
 | 多篇汇编 | `compilation` | `title`、`date` | 封面 + 目录 + 正文；`date_style: chinese` 可把封面日期写成汉字 |
 

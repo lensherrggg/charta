@@ -167,6 +167,9 @@ fn indent_xml(indent: &Indent) -> String {
             (chars * 100.0).round() as i32
         ));
     }
+    if let Some(twips) = indent.left_twips {
+        attrs.push_str(&format!(" w:left=\"{twips}\""));
+    }
     if let Some(chars) = indent.right_chars {
         attrs.push_str(&format!(
             " w:rightChars=\"{}\"",

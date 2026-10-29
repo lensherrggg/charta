@@ -4,10 +4,10 @@
 
 | 对象 | 版本 | 说明 |
 |---|---|---|
-| workspace / 全部 crate | `0.2.0` | 引擎与工具链版本，单一来源 |
+| workspace / 全部 crate | `0.3.0` | 引擎与工具链版本，单一来源 |
 | IR 格式 | `1.1` | `charta::IR_VERSION`，JSON 契约 |
 | 报告格式 | `1.0` | `charta::REPORT_VERSION`，JSON 契约 |
-| CLI | `0.2.0` | 与 workspace 同步 |
+| CLI | `0.3.0` | 与 workspace 同步 |
 
 ## 单一来源
 
@@ -28,7 +28,7 @@
 
 ```bash
 # 1. 更新 workspace 版本与内部依赖版本
-bash scripts/bump-version.sh 0.2.0
+bash scripts/bump-version.sh 0.3.0
 
 # 2. 更新 CHANGELOG.md，把 Unreleased 内容归入新版本
 # 3. 全量检查
@@ -38,8 +38,8 @@ cargo test --workspace
 
 # 4. 提交并打标签（仅在确认后执行）
 git add Cargo.toml Cargo.lock CHANGELOG.md
-git commit -m "release: v0.2.0"
-git tag v0.2.0
+git commit -m "release: v0.3.0"
+git tag v0.3.0
 ```
 
 `scripts/bump-version.sh` 只修改根 `Cargo.toml` 的版本号，不自动改 CHANGELOG、不提交、不打标签，避免把发布决策自动化。

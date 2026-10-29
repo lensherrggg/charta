@@ -1,6 +1,6 @@
 use crate::numbering::list_marker;
 use crate::styles::{DocStyles, StyleSet, STYLE_BODY, STYLE_STRONG, STYLE_TITLE};
-use crate::{CompilationBackend, DocOptions, Gb9704Backend, GeneralBackend};
+use crate::{CompilationBackend, DocOptions, Gb9704Backend, GeneralBackend, MinutesBackend};
 use charta::{
     Alignment, Backend, Block, Determinism, Document, FrontendId, ImageBlock, Inline, IssueDetails,
     IssueKind, ListBlock, ListItem, MetaValue, Metadata, RenderRequest, SourceSpan, StyleIntent,
@@ -1391,6 +1391,55 @@ fn signer_switches_header_to_upward_layout() {
     assert!(body.contains("昆政发〔2026〕1号"));
     assert!(styles.contains("<w:tab w:val=\"right\" w:leader=\"none\" w:pos=\"8524\"/>"));
     assert!(styles.contains("楷体_GB2312"));
+}
+
+#[test]
+fn renders_minutes_with_attendance_and_record() {
+    let mut metadata = Metadata::new();
+    metadata.insert("meeting", "昆山市人民政府常务会议");
+    let list = |items: &[&str]| {
+        MetaValue::List(
+            items
+                .iter()
+                .map(|item| MetaValue::String((*item).to_owned()))
+                .collect(),
+        )
+    };
+    metadata.insert("attendees", list(&["张三", "李四"]));
+    metadata.insert("absentees", list(&["赵六"]));
+    metadata.insert("observers", list(&["市发改委 钱七"]));
+    metadata.insert("cc", list(&["市委办公室"]));
+    metadata.insert("issuing_office", "昆山市人民政府办公室");
+    metadata.insert("issuing_date", "2026-10-26");
+    let blocks = vec![
+        Block::heading(
+            1,
+            vec![Inline::text("关于公文格式检查的会议纪要", span())],
+            span(),
+        ),
+        Block::heading(2, vec![Inline::text("一、会议基本情况", span())], span()),
+        Block::paragraph(vec![Inline::text("会议听取了汇报。", span())], span()),
+    ];
+    let document = Document::new(FrontendId::Markdown, metadata).with_blocks(blocks);
+    let output = MinutesBackend::new()
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let body = part(&output.docx, "word/document.xml");
+    let styles = part(&output.docx, "word/styles.xml");
+    assert!(body.contains("昆山市人民政府常务会议纪要"));
+    assert!(body.contains("<w:pStyle w:val=\"GbRedLine\"/>"));
+    assert!(body.contains("<w:pStyle w:val=\"GbAttendance\"/>"));
+    assert!(body.contains("出席："));
+    assert!(body.contains("请假："));
+    assert!(body.contains("列席："));
+    assert!(body.contains("分送：市委办公室"));
+    assert!(!body.contains("GbDocNumber"));
+    assert!(!body.contains("GbIssuer"));
+    assert!(!body.contains("GbSigner"));
+    assert!(styles.contains("w:left=\"1600\" w:hanging=\"960\""));
 }
 
 #[test]

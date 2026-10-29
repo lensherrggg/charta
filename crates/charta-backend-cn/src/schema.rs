@@ -26,6 +26,19 @@ pub(crate) fn build_schema(header: bool) -> MetadataSchema {
     ])
 }
 
+pub(crate) fn build_minutes_schema(record: bool) -> MetadataSchema {
+    MetadataSchema::new(vec![
+        FieldSchema::string("meeting", true).describe("会议名称；标志渲染为“会议名称纪要”"),
+        FieldSchema::string_list("attendees", false).describe("出席人员"),
+        FieldSchema::string_list("absentees", false).describe("请假人员"),
+        FieldSchema::string_list("observers", false).describe("列席人员"),
+        FieldSchema::string_list("attachments", false).describe("附件名称"),
+        FieldSchema::string_list("cc", record).describe("分送机关；关闭版记时不必填"),
+        FieldSchema::string("issuing_office", record).describe("印发机关；关闭版记时不必填"),
+        FieldSchema::date("issuing_date", record).describe("印发日期；关闭版记时不必填"),
+    ])
+}
+
 pub(crate) fn build_general_schema() -> MetadataSchema {
     MetadataSchema::new(vec![
         FieldSchema::string("author", false).describe("姓名；与日期都省略时不生成署名行"),

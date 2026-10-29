@@ -2,7 +2,7 @@
 
 Charta（拉丁语 *charta*，纸、文书）是一个以**语义 IR** 为核心的 docx 生成引擎。前端只负责写内容、填元数据；视觉形态由规范后端决定；样式意图与静态不可确定性都会进入审计报告。
 
-当前版本：**0.2.0**
+当前版本：**0.3.0**
 
 - IR 格式：`1.1`
 - 报告格式：`1.0`
@@ -26,10 +26,10 @@ charta/
 │   ├── charta-md/               # Markdown 前端
 │   ├── charta-typst/            # Typst 前端（只读 CST 子集）
 │   ├── charta-docx-kit/         # OOXML 机械操作工具箱
-│   ├── charta-backend-cn/       # 中文公文模板后端：通知、通用材料、文件汇编
+│   ├── charta-backend-cn/       # 中文公文模板后端：通知、纪要、通用材料、文件汇编
 │   │   ├── data/styles.json     # 通知样式（字体/字号/页边距/表格等）
 │   │   ├── data/general-styles.json # 通用材料与文件汇编样式
-│   │   └── src/layout/          # 版头/主体/版记/封面/目录/文本/页脚流程
+│   │   └── src/layout/          # 版头/主体/版记/纪要标志与名单/封面/目录/文本/页脚流程
 │   └── charta-cli/              # CLI 薄壳
 ├── docs/DESIGN.md               # 设计文档
 ├── docs/VERSIONING.md           # 版本管理
@@ -72,6 +72,25 @@ cargo run -p charta-cli -- convert examples/request.md --backend gb9704 \
 ```
 
 元数据里加一行 `signer: 张三` 即可：发文字号改为居左空一字，右侧同一行排"签发人：张三"。
+
+### 转换会议纪要（纪要格式）
+
+```bash
+cargo run -p charta-cli -- convert examples/minutes.md --backend gb9704-minutes   --output out/minutes.docx
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|:---:|---|
+| `meeting` | string | 是 | 会议名称；标志渲染为“会议名称纪要” |
+| `attendees` | list<string> | 否 | 出席人员，渲染为“出席：张三、李四” |
+| `absentees` | list<string> | 否 | 请假人员 |
+| `observers` | list<string> | 否 | 列席人员 |
+| `attachments` | list<string> | 否 | 附件名称 |
+| `cc` | list<string> | 是* | 分送机关；关闭版记时不必填 |
+| `issuing_office` | string | 是* | 印发机关 |
+| `issuing_date` | date | 是* | 印发日期 |
+
+纪要没有发文字号、发文机关署名和成文日期，也不生成印章；标志用红色小标宋居中，上边缘位置与通知版头一致，标志下加一条红色分隔线（GB/T 9704 10.3 未强制，按常见做法）。标题取正文第一个一级标题。出席/请假/列席名单排在正文下空一行、左空二字，冒号后接 3 号仿宋姓名，回行与冒号后首字对齐。版记沿用末节沉底，抄送栏改为“分送”。`--no-header` 去掉标志，`--no-record` 去掉版记。
 
 ### 转换 Markdown 通用材料（默认后端）
 
@@ -202,6 +221,7 @@ cargo run -p charta-cli -- backends
 cargo run -p charta-cli -- schema --backend gb9704
 cargo run -p charta-cli -- schema --backend gb9704 --json
 cargo run -p charta-cli -- schema --backend general
+cargo run -p charta-cli -- schema --backend gb9704-minutes
 ```
 
 ### 通用材料模板（general）
@@ -299,15 +319,15 @@ charta --version
 | 参数 | 说明 |
 |---|---|
 | `--frontend auto\|md\|typst` | 默认按扩展名判断 |
-| `--backend <ID>` | 默认 `general`（通用材料）；可选 `compilation`（文件汇编）、`gb9704`（通知） |
+| `--backend <ID>` | 默认 `general`（通用材料）；可选 `compilation`（文件汇编）、`gb9704`（通知）、`gb9704-minutes`（纪要） |
 | `-o, --output <PATH>` | docx 路径，默认与源文件同名 |
 | `--report <PATH>` | JSON 报告路径；不传则不生成文件 |
 | `--report-md <PATH>` | Markdown 报告路径；不传则不生成文件 |
 | `--emit-ir <PATH>` | 额外输出 IR JSON |
 | `--strict` | 契约外语法升级为阻断 |
 | `--styles <PATH>` | 外部样式 JSON：完整样式文件或只含改动项的补丁 |
-| `--no-header` | 不生成版头；`doc_number` 随之不再必填（仅 gb9704） |
-| `--no-record` | 不生成版记及末页沉底分节（仅 gb9704） |
+| `--no-header` | 不生成版头；`doc_number` 随之不再必填（gb9704 / gb9704-minutes） |
+| `--no-record` | 不生成版记及末页沉底分节（gb9704 / gb9704-minutes） |
 | `--adopt-color <BOOL>` | 是否采纳颜色意图，默认 `true` |
 | `--adopt-font-family <BOOL>` | 是否采纳字体意图，默认 `false` |
 | `--adopt-font-size <BOOL>` | 是否采纳字号意图，默认 `false` |
@@ -520,12 +540,12 @@ severity 为 `blocking` 或 `warning`。默认只有 schema 校验（含 `charta
 - workspace 版本单一来源：根 `Cargo.toml` 的 `[workspace.package]`，所有 crate 使用 `version.workspace = true`。
 - 内部依赖版本集中在 `[workspace.dependencies]`。
 - IR 与报告格式版本独立维护（当前 IR `1.1`、报告 `1.0`）。
-- 递增版本：`bash scripts/bump-version.sh 0.2.0`，然后更新 `CHANGELOG.md` 并执行发布检查。
+- 递增版本：`bash scripts/bump-version.sh 0.3.0`，然后更新 `CHANGELOG.md` 并执行发布检查。
 - 详见 [docs/VERSIONING.md](docs/VERSIONING.md)。
 
-## 已知限制（0.2.0）
+## 已知限制（0.3.0）
 
-- 已提供 GB/T 9704 通知与通用材料两个后端；会议纪要、请示、函、企业公文后端在后续阶段。
+- 已提供通知（含上行文签发人）、会议纪要、通用材料、文件汇编四个后端；信函格式、命令（令）、联合行文与企业公文在后续阶段。
 - 通用材料后端以 Markdown 使用为主；表格题注的后端渲染已存在，但 Markdown 语法入口尚未实现。
 - 图片只支持 PNG/JPEG/GIF；读取失败、格式不支持或尺寸解析失败会报告 `image_read_failed` / `image_decode_failed` 并跳过该图，不阻断转换。
 - Typst 已支持标题、行内强调、嵌套列表、图片与受限表格；动态内容（`#for`/`#if` 结果、变量路径、动态列数）仍按“不可静态确定”报告，数学公式与原始块只保留文字。

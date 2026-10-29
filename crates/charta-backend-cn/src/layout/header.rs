@@ -69,7 +69,7 @@ fn document_number_paragraph(
 
 /// The red header keeps its 36 pt height; names wider than the text column are
 /// narrowed horizontally (Word's 字符缩放) so they stay on one line.
-fn organization_scale(text: &str, styles: &DocStyles) -> Option<u32> {
+pub(crate) fn organization_scale(text: &str, styles: &DocStyles) -> Option<u32> {
     let size_pt = styles.run(STYLE_ORG_MARK).size_pt;
     let text_width_mm = styles.page().setup().text_width_mm();
     let em_mm = size_pt * 25.4 / 72.0;

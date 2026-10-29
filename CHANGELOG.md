@@ -4,9 +4,12 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-29
+
 ### Added
 
 - 通知后端支持上行文版头：元数据提供 `signer` 时，发文字号改为居左空一字，"签发人：姓名"居右空一字并排在同一行（"签发人"3 号仿宋、姓名 3 号楷体），不再报告 `metadata_ignored`；新增样式 `GbDocNumberUp`、`GbSigner` 与示例 `examples/request.md`。
+- 新增纪要后端 `gb9704-minutes`：红色“会议名称纪要”标志；正文下排出席/请假/列席名单（3 号黑体标签 + 3 号仿宋姓名，左空二字、悬挂缩进对齐）；无发文字号、署名、成文日期和印章，标志下按常见做法加红色分隔线（10.3 未强制）；版记沿用末节沉底，抄送栏改为“分送”。新增样式 `GbAttendance` 与示例 `examples/minutes.md`；样式数据支持 `hanging_chars`/`hanging_twips`、`left_twips` 缩进。
 
 ### Changed
 

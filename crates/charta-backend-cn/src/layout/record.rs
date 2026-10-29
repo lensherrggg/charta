@@ -9,7 +9,7 @@ use crate::layout::text::plain_paragraph;
 use crate::layout::{chinese_date, list_field, string_field};
 use crate::styles::{DocStyles, STYLE_VERSION};
 
-pub(crate) fn render(docx: &mut Docx, metadata: &Metadata, styles: &DocStyles) {
+pub(crate) fn render(docx: &mut Docx, metadata: &Metadata, styles: &DocStyles, cc_label: &str) {
     docx.push(BodyItem::SectionBreak(SectionBreak {
         page: docx.page,
         continuous: false,
@@ -40,7 +40,7 @@ pub(crate) fn render(docx: &mut Docx, metadata: &Metadata, styles: &DocStyles) {
     if has_cc {
         rows.push(TableRow {
             cells: vec![TableCell::new(vec![plain_paragraph(
-                &format!("抄送：{}", cc.join("、")),
+                &format!("{}：{}", cc_label, cc.join("、")),
                 STYLE_VERSION,
                 style,
             )])

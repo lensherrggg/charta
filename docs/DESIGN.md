@@ -423,7 +423,7 @@ pub trait Backend: Send + Sync {
 
 ### 6.7 后端内部结构
 
-规范后端不是配置文件，也不是纯代码，而是“契约实现 + 数据 + 流程 + 报告”的 crate。`charta-backend-cn` 承载通知、通用材料和文件汇编三个模板，按职责拆分：
+规范后端不是配置文件，也不是纯代码，而是“契约实现 + 数据 + 流程 + 报告”的 crate。`charta-backend-cn` 承载通知、纪要、通用材料和文件汇编四个模板，按职责拆分：
 
 | 路径 | 职责 |
 |---|---|
@@ -432,7 +432,8 @@ pub trait Backend: Send + Sync {
 | `styles.rs` + `data/styles.json` / `data/general-styles.json` | 样式值与标题编号定义加载、校验与 docx-kit 转换（通知/通用材料各自必需集） |
 | `layout/header.rs` | 版头：份号、密级/紧急程度、机关标志、发文字号、红线 |
 | `layout/body.rs` | 主体：标题、主送机关、IR 块、附件说明、署名日期、附注；列表、表格、图片与题注流程 |
-| `layout/record.rs` | 版记：末节底端对齐、抄送与印发机关/日期表格 |
+| `layout/minutes.rs` | 纪要：红色会议标志、出席/请假/列席名单 |
+| `layout/record.rs` | 版记：末节底端对齐、抄送/分送与印发机关/日期表格 |
 | `layout/text.rs` | run 构建、样式意图采纳与覆盖记录 |
 | `layout/footer.rs` | 奇偶页页码 |
 | `layout/cover.rs` | 文件汇编封面（空行、标题、日期） |
@@ -470,7 +471,17 @@ pub trait Backend: Send + Sync {
 - 正文：`#` 为篇章标题，使用 `GbTitle` 样式但不编号；`##` 起按通用模板四级编号（`一、` / `（一）` / `1.` / `（1）`），每个 `#` 重开编号区段；标题写 `outlineLvl`。不生成署名区、主送机关和附件说明，`author` / `recipient` 若提供会报告 `metadata_ignored`。
 - 封面、目录与正文样式都在 `general-styles.json`；`CompilationBackend` 提供 `try_new` / `try_with_styles` / `with_styles` / `with_style_file`，补丁与通用模板一致。
 
-### 6.10 pandoc reference.docx
+### 6.10 纪要模板（gb9704-minutes）
+
+`gb9704-minutes` 复用通知的样式集与主体流程，按 GB/T 9704-2012 10.3 的纪要格式渲染，独立成后端是因为 schema 与主体尾部结构和通知差别大：
+
+- 标志：`meeting` 加“纪要”组成，红色小标宋、居中，上边缘位置与通知发文机关标志一致；超过版心宽度同样做字符缩放。标志下按常见做法加一条红色分隔线（10.3 未强制、允许自定），复用 `GbRedLine`。纪要没有发文字号和签发人。
+- 主体尾部：没有发文机关署名、成文日期和印章；正文（或附件说明）下空一行排“出席/请假/列席”，左空二字，`出席` 等标签 3 号黑体、姓名 3 号仿宋，回行与冒号后首字对齐。
+- 缩进用数值制表位以外的 `w:left`/`w:hanging`（1600/960 twips）；`w:hangingChars` 在 Word 里会丢失悬挂缩进，样式数据不写字符版悬挂。
+- 版记沿用末节沉底与偶数页规则，抄送栏标签为“分送”；`cc`、`issuing_office`、`issuing_date` 在开启版记时必填。
+- `--no-header` 去掉标志，`--no-record` 去掉版记；页码与通知一致。标题取正文第一个一级标题（与通知/通用一致），元数据 `title` 若提供报告 `metadata_ignored`。
+
+### 6.11 pandoc reference.docx
 
 `DocStyles::pandoc_reference_docx()` 用样式数据生成 pandoc 的 `reference.docx`；CLI 入口为 `charta reference`。pandoc 按 Word 内置样式 ID 取样式，而 Charta 的 `Gb*` ID 带规范语义，因此生成时只改 ID 与显示名，格式值全部沿用样式数据：
 

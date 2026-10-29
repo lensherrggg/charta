@@ -198,6 +198,24 @@
       }
     },
     {
+      "id": "GbAttendance",
+      "name": "GB Attendance List",
+      "based_on": "Normal",
+      "paragraph": {
+        "line_spacing_pt": 28.0,
+        "indent": {
+          "left_twips": 1600,
+          "hanging_twips": 960
+        }
+      },
+      "run": {
+        "east_asia_font": "仿宋_GB2312",
+        "size_pt": 16.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
       "id": "GbHeading1",
       "name": "GB Heading 1",
       "based_on": "GbBody",
@@ -520,7 +538,10 @@
   },
   "version_record": {
     "width_mm": 156.0,
-    "columns_mm": [100.0, 56.0],
+    "columns_mm": [
+      100.0,
+      56.0
+    ],
     "cell_margin_mm": 0.0,
     "date_alignment": "right",
     "border": {

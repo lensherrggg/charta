@@ -28,7 +28,7 @@ mod styles;
 
 pub use styles::{DocStyles, StyleSet};
 
-use schema::{build_compilation_schema, build_general_schema, build_schema};
+use schema::{build_compilation_schema, build_general_schema, build_minutes_schema, build_schema};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DocTemplate {
@@ -236,7 +236,7 @@ impl Backend for Gb9704Backend {
             &mut issues,
         );
         if self.options.record {
-            layout::record::render(&mut docx, metadata, &self.styles);
+            layout::record::render(&mut docx, metadata, &self.styles, "抄送");
         }
 
         let bytes = docx
@@ -456,6 +456,138 @@ impl Backend for CompilationBackend {
         let bytes = docx
             .to_bytes()
             .map_err(|error| charta::Error::backend("compilation", error.to_string()))?;
+        Ok(RenderOutput::with_issues(bytes, issues))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MinutesBackend {
+    schema: MetadataSchema,
+    options: DocOptions,
+    styles: DocStyles,
+}
+
+impl Default for MinutesBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MinutesBackend {
+    /// # Panics
+    ///
+    /// Panics if the embedded style data is invalid. Use [`Self::try_new`] to
+    /// handle the error instead.
+    pub fn new() -> Self {
+        Self::try_new().expect("内置 GB/T 9704 样式数据必须有效")
+    }
+
+    pub fn try_new() -> charta::Result<Self> {
+        Self::try_with_options(DocOptions::default())
+    }
+
+    /// # Panics
+    ///
+    /// Panics if the embedded style data is invalid.
+    pub fn with_options(options: DocOptions) -> Self {
+        Self::try_with_options(options).expect("内置 GB/T 9704 样式数据必须有效")
+    }
+
+    pub fn try_with_options(options: DocOptions) -> charta::Result<Self> {
+        Ok(Self {
+            schema: build_minutes_schema(options.record),
+            options,
+            styles: DocStyles::embedded()?,
+        })
+    }
+
+    pub fn with_styles(options: DocOptions, styles: DocStyles) -> Self {
+        Self::try_with_styles(options, styles).expect("纪要样式数据必须包含完整样式集")
+    }
+
+    pub fn try_with_styles(options: DocOptions, styles: DocStyles) -> charta::Result<Self> {
+        styles.validate(StyleSet::Notice)?;
+        Ok(Self {
+            schema: build_minutes_schema(options.record),
+            options,
+            styles,
+        })
+    }
+
+    /// Loads style data from an external JSON file. The file may be complete
+    /// style data or a patch merged over the embedded data.
+    pub fn with_style_file(
+        options: DocOptions,
+        path: impl AsRef<std::path::Path>,
+    ) -> charta::Result<Self> {
+        Self::try_with_styles(
+            options,
+            DocStyles::from_external_for(path, StyleSet::Notice)?,
+        )
+    }
+
+    pub fn options(&self) -> &DocOptions {
+        &self.options
+    }
+
+    pub fn styles(&self) -> &DocStyles {
+        &self.styles
+    }
+}
+
+impl Backend for MinutesBackend {
+    fn id(&self) -> &'static str {
+        "gb9704-minutes"
+    }
+
+    fn display_name(&self) -> &str {
+        "GB/T 9704-2012 纪要"
+    }
+
+    fn schema(&self) -> &MetadataSchema {
+        &self.schema
+    }
+
+    fn render(&self, request: RenderRequest<'_>) -> Result<RenderOutput> {
+        let metadata = request.metadata;
+        let mut issues = Vec::new();
+        if metadata.get("title").is_some() {
+            issues.push(report::ignored_metadata(
+                "title",
+                "纪要以正文第一个一级标题作为标题，元数据 title 不参与渲染",
+            ));
+        }
+        issues.extend(option_ignored_metadata(metadata, &self.options));
+
+        let mut docx = Docx::new();
+        docx.page = self.styles.page().setup();
+        docx.styles = self.styles.stylesheet();
+        docx.core = CoreProperties {
+            title: layout::body::first_title(&request.document.blocks),
+            creator: layout::string_field(metadata, "meeting").map(str::to_owned),
+            subject: None,
+            created: None,
+        };
+        docx.footers = layout::footer::build(&self.styles);
+
+        if self.options.header {
+            layout::minutes::render_mark(&mut docx, metadata, &self.styles);
+        }
+        layout::body::render_minutes(
+            &mut docx,
+            metadata,
+            &request.document.blocks,
+            &self.options,
+            &self.styles,
+            &mut issues,
+        );
+        if self.options.record {
+            layout::record::render(&mut docx, metadata, &self.styles, "分送");
+        }
+
+        let bytes = docx
+            .to_bytes()
+            .map_err(|error| charta::Error::backend("gb9704-minutes", error.to_string()))?;
         Ok(RenderOutput::with_issues(bytes, issues))
     }
 }

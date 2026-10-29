@@ -2,7 +2,8 @@
 
 use charta::{convert, Backend, ConversionRequest, Frontend, SourceFile};
 use charta_backend_cn::{
-    CompilationBackend, DocOptions, DocStyles, DocTemplate, Gb9704Backend, GeneralBackend, StyleSet,
+    CompilationBackend, DocOptions, DocStyles, DocTemplate, Gb9704Backend, GeneralBackend,
+    MinutesBackend, StyleSet,
 };
 use charta_md::MarkdownFrontend;
 use charta_typst::TypstFrontend;
@@ -38,7 +39,7 @@ enum Command {
 
 #[derive(Args)]
 struct ReferenceArgs {
-    /// 样式来源后端：general（通用材料）、compilation（文件汇编）或 gb9704（通知）
+    /// 样式来源后端：general（通用材料）、compilation（文件汇编）、gb9704（通知）或 gb9704-minutes（纪要）
     #[arg(long, default_value = "general", value_name = "ID")]
     backend: String,
 
@@ -66,7 +67,7 @@ struct ConvertArgs {
     #[arg(long, value_enum, default_value_t = FrontendChoice::Auto)]
     frontend: FrontendChoice,
 
-    /// 目标规范后端：general（通用材料）、compilation（文件汇编）或 gb9704（通知）
+    /// 目标规范后端：general（通用材料）、compilation（文件汇编）、gb9704（通知）或 gb9704-minutes（纪要）
     #[arg(long, default_value = "general", value_name = "ID")]
     backend: String,
 
@@ -94,11 +95,11 @@ struct ConvertArgs {
     #[arg(long, value_name = "PATH")]
     styles: Option<PathBuf>,
 
-    /// 不生成版头（份号、密级、紧急程度、发文机关标志、发文字号与红色分隔线；仅 gb9704）
+    /// 不生成版头（份号、密级、紧急程度、发文机关标志、发文字号与红色分隔线；gb9704 系列）
     #[arg(long)]
     no_header: bool,
 
-    /// 不生成版记（抄送、印发机关、印发日期及末页沉底分节；仅 gb9704）
+    /// 不生成版记（抄送/分送、印发机关、印发日期及末页沉底分节；gb9704 系列）
     #[arg(long)]
     no_record: bool,
 
@@ -161,6 +162,7 @@ fn run(cli: Cli) -> CliResult<i32> {
             println!("{:<12} {:<28} schema 字段数", "ID", "名称");
             let backends: Vec<Box<dyn Backend>> = vec![
                 Box::new(Gb9704Backend::try_new()?),
+                Box::new(MinutesBackend::try_new()?),
                 Box::new(GeneralBackend::try_new()?),
                 Box::new(CompilationBackend::try_new()?),
             ];
@@ -299,11 +301,11 @@ fn convert_command(args: ConvertArgs) -> CliResult<i32> {
 
 fn reference_command(args: ReferenceArgs) -> CliResult<i32> {
     let set = match args.backend.as_str() {
-        "gb9704" => StyleSet::Notice,
+        "gb9704" | "gb9704-minutes" => StyleSet::Notice,
         "general" | "compilation" => StyleSet::General,
         other => {
             return Err(charta::Error::InvalidArgument(format!(
-                "reference 支持 general、compilation、gb9704，未知后端 `{other}`"
+                "reference 支持 general、compilation、gb9704、gb9704-minutes，未知后端 `{other}`"
             ))
             .into())
         }
@@ -356,6 +358,10 @@ fn resolve_backend_with_options(
             let styles = load_styles(style_path, StyleSet::Notice)?;
             Ok(Box::new(Gb9704Backend::with_styles(options, styles)))
         }
+        "gb9704-minutes" => {
+            let styles = load_styles(style_path, StyleSet::Notice)?;
+            Ok(Box::new(MinutesBackend::with_styles(options, styles)))
+        }
         "general" => {
             let styles = load_styles(style_path, StyleSet::General)?;
             Ok(Box::new(GeneralBackend::try_with_styles(styles)?))
@@ -365,7 +371,7 @@ fn resolve_backend_with_options(
             Ok(Box::new(CompilationBackend::try_with_styles(styles)?))
         }
         other => Err(charta::Error::InvalidArgument(format!(
-            "未知后端 `{other}`；当前可用：general、compilation、gb9704"
+            "未知后端 `{other}`；当前可用：general、compilation、gb9704、gb9704-minutes"
         ))
         .into()),
     }
