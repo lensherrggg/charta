@@ -204,12 +204,6 @@ impl Backend for Gb9704Backend {
     fn render(&self, request: RenderRequest<'_>) -> Result<RenderOutput> {
         let metadata = request.metadata;
         let mut issues = Vec::new();
-        if metadata.get("signer").is_some() {
-            issues.push(report::ignored_metadata(
-                "signer",
-                "通知属于下行文，不渲染签发人；上行文后端再实现",
-            ));
-        }
         if metadata.get("title").is_some() {
             issues.push(report::ignored_metadata(
                 "title",

@@ -21,6 +21,8 @@ pub(crate) const STYLE_COPY_NUMBER: &str = "GbCopyNumber";
 pub(crate) const STYLE_MARK: &str = "GbMark";
 pub(crate) const STYLE_ORG_MARK: &str = "GbOrgMark";
 pub(crate) const STYLE_DOC_NUMBER: &str = "GbDocNumber";
+pub(crate) const STYLE_DOC_NUMBER_UP: &str = "GbDocNumberUp";
+pub(crate) const STYLE_SIGNER: &str = "GbSigner";
 pub(crate) const STYLE_RED_LINE: &str = "GbRedLine";
 pub(crate) const STYLE_TITLE: &str = "GbTitle";
 pub(crate) const STYLE_RECIPIENT: &str = "GbRecipient";
@@ -56,6 +58,8 @@ const REQUIRED_STYLES: &[&str] = &[
     STYLE_MARK,
     STYLE_ORG_MARK,
     STYLE_DOC_NUMBER,
+    STYLE_DOC_NUMBER_UP,
+    STYLE_SIGNER,
     STYLE_RED_LINE,
     STYLE_TITLE,
     STYLE_RECIPIENT,

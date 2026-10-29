@@ -61,11 +61,13 @@ Windows 下可执行文件是 `charta.exe`，参数相同。
 
 | 体裁 | 后端 | 必填元数据 | 说明 |
 |---|---|---|---|
-| 正式通知 | `gb9704` | `doc_number`、`issuer`、`date` | 首个 `#` 即大标题；版头、版记、28 磅行距、页码；`organization`/`recipient`/`cc`/`attachments` 等可选 |
+| 正式通知 | `gb9704` | `doc_number`、`issuer`、`date` | 首个 `#` 即大标题；版头、版记、28 磅行距、页码；`organization`/`recipient`/`cc`/`attachments` 等可选；填 `signer` 改按上行文排版（发文字号居左空一字，签发人居右空一字） |
 | 一般材料 | `general` | 无 | 首个 `#` 即大标题；`author`、`date`、`recipient` 都可选 |
 | 多篇汇编 | `compilation` | `title`、`date` | 封面 + 目录 + 正文；`date_style: chinese` 可把封面日期写成汉字 |
 
 通知的 `--no-header` 会取消版头，`doc_number` 变为非必填；`--no-record` 取消版记。关闭后仍提供对应专属元数据会得到 `metadata_ignored` 告警。
+
+上行文（请示、报告）在元数据里加 `signer: 姓名`：发文字号自动改为居左空一字，右侧同一行排“签发人：姓名”（姓名用 3 号楷体）。不填 `signer` 就是下行文居中式版头；签发人目前只支持一人。
 
 ## 标题层级
 

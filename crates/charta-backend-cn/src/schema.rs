@@ -8,6 +8,8 @@ pub(crate) fn build_schema(header: bool) -> MetadataSchema {
     MetadataSchema::new(vec![
         FieldSchema::string("doc_number", header)
             .describe("发文字号，例如 昆政发〔2026〕1 号；关闭版头时不必填"),
+        FieldSchema::string("signer", false)
+            .describe("签发人姓名；提供即按上行文版头排版，发文字号居左空一字、签发人居右空一字"),
         FieldSchema::string("issuer", true).describe("发文机关署名"),
         FieldSchema::date("date", true).describe("成文日期（YYYY-MM-DD）"),
         FieldSchema::string("organization", false).describe("发文机关标志，缺省使用 issuer"),

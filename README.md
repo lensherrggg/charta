@@ -64,6 +64,15 @@ cargo run -p charta-cli -- convert examples/notice.md --backend gb9704 \
 
 通知的署名和日期右空由样式数据 `GbIssuer` / `GbDate` 的 `right_chars` 换算成行尾普通空格写入正文（16 pt 下 1 字 = 4 个空格），段右缩进为零并关闭 `wordWrap`，Word/WPS 才会把行尾空格计入行宽。生成后可直接在 Word 里增删落款末尾的空格调整左右位置：删 4 个右移 1 字，加 4 个左移 1 字。不要用全角空格；普通空格能生效是因为段落带了 `wordWrap=0`，复制文本到别的文档后该属性会丢失。
 
+### 转换上行文（请示、报告）
+
+```bash
+cargo run -p charta-cli -- convert examples/request.md --backend gb9704 \
+  --output out/request.docx
+```
+
+元数据里加一行 `signer: 张三` 即可：发文字号改为居左空一字，右侧同一行排"签发人：张三"。
+
 ### 转换 Markdown 通用材料（默认后端）
 
 ```bash
@@ -388,6 +397,7 @@ Typst 表格只接受字面量子集：`columns` 为整数或元组（元组只�
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|:---:|---|
 | `doc_number` | string | 是* | 发文字号；关闭版头时不必填 |
+| `signer` | string | 否 | 签发人姓名；提供即按上行文排版，发文字号居左空一字、签发人居右空一字 |
 | `issuer` | string | 是 | 发文机关署名 |
 | `date` | date | 是 | 成文日期，`YYYY-MM-DD` |
 | `organization` | string | 否 | 发文机关标志，缺省用 `issuer` |
@@ -401,7 +411,7 @@ Typst 表格只接受字面量子集：`columns` 为整数或元组（元组只�
 | `attachments` | list<string> | 否 | 附件名称 |
 | `note` | string | 否 | 附注，缺省自动加圆括号 |
 
-通知属于下行文，不接受 `signer`；若元数据中仍提供，会报告 `metadata_ignored` 且不渲染。上行文的签发人口径留到请示/报告后端。
+通知默认按下行文排版：发文字号居中，不标签发人。填 `signer` 后按上行文（请示、报告）排版：发文字号居左空一字，与"签发人：姓名"同一行，签发人居右空一字；"签发人"三字用 3 号仿宋、姓名用 3 号楷体（GB/T 9704-2012 7.2.5、7.2.6）。目前只支持单个签发人。
 
 关闭版头后 `doc_number` 不再必填；`doc_number`、`copy_number`、`security_level`、`urgency` 若仍提供会报告 `metadata_ignored`。关闭版记后 `cc`、`issuing_office`、`issuing_date` 同理。
 

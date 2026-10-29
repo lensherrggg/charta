@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- 通知后端支持上行文版头：元数据提供 `signer` 时，发文字号改为居左空一字，"签发人：姓名"居右空一字并排在同一行（"签发人"3 号仿宋、姓名 3 号楷体），不再报告 `metadata_ignored`；新增样式 `GbDocNumberUp`、`GbSigner` 与示例 `examples/request.md`。
+
 ### Changed
 
 - 通知后端的大标题改为取正文第一个一级标题（`#`），不再读取元数据 `title`（仍提供会报告 `metadata_ignored`）；标题层级整体与通用/汇编对齐，`##` 起才是一级标题与编号起点，通知标题也写入 `outlineLvl`。

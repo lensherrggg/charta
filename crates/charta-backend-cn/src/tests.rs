@@ -1370,7 +1370,7 @@ fn rowspan_beyond_last_row_is_reported() {
 }
 
 #[test]
-fn signer_is_reported_as_ignored() {
+fn signer_switches_header_to_upward_layout() {
     let mut document = document();
     document.metadata.insert("signer", "张三");
     let output = Gb9704Backend::new()
@@ -1379,10 +1379,18 @@ fn signer_is_reported_as_ignored() {
             metadata: &document.metadata,
         })
         .unwrap();
-    assert!(output.issues.iter().any(|issue| matches!(
+    assert!(!output.issues.iter().any(|issue| matches!(
         &issue.details,
         IssueDetails::RenderWarning { code, .. } if code == "metadata_ignored"
     )));
+    let body = part(&output.docx, "word/document.xml");
+    let styles = part(&output.docx, "word/styles.xml");
+    assert!(body.contains("<w:pStyle w:val=\"GbDocNumberUp\"/>"));
+    assert!(body.contains("<w:tab/>"));
+    assert!(body.contains("签发人："));
+    assert!(body.contains("昆政发〔2026〕1号"));
+    assert!(styles.contains("<w:tab w:val=\"right\" w:leader=\"none\" w:pos=\"8524\"/>"));
+    assert!(styles.contains("楷体_GB2312"));
 }
 
 #[test]

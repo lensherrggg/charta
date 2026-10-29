@@ -114,6 +114,43 @@
       }
     },
     {
+      "id": "GbDocNumberUp",
+      "name": "GB Document Number (Upward)",
+      "based_on": "GbDocNumber",
+      "paragraph": {
+        "alignment": "left",
+        "indent": {
+          "left_chars": 1.0
+        },
+        "tabs": [
+          {
+            "position_mm": 150.36,
+            "alignment": "right"
+          }
+        ]
+      },
+      "run": {
+        "east_asia_font": "仿宋_GB2312",
+        "size_pt": 16.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
+      "id": "GbSigner",
+      "name": "GB Signer Name",
+      "based_on": "Normal",
+      "paragraph": {
+        "line_spacing_pt": 28.0
+      },
+      "run": {
+        "east_asia_font": "楷体_GB2312",
+        "size_pt": 16.0,
+        "bold": false,
+        "color": "black"
+      }
+    },
+    {
       "id": "GbRedLine",
       "name": "GB Red Separator",
       "based_on": "Normal",

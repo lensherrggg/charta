@@ -1,13 +1,14 @@
-//! 版头: copy number, security marks, organization mark, document number and
-//! the red separator.
+//! 版头: copy number, security marks, organization mark, document number (and
+//! the signer line of an upward document) and the red separator.
 
 use charta::Metadata;
 use charta_docx_kit::{Docx, Paragraph};
 
 use crate::layout::string_field;
-use crate::layout::text::plain_paragraph;
+use crate::layout::text::{plain_paragraph, styled_run};
 use crate::styles::{
-    DocStyles, STYLE_COPY_NUMBER, STYLE_DOC_NUMBER, STYLE_MARK, STYLE_ORG_MARK, STYLE_RED_LINE,
+    DocStyles, STYLE_COPY_NUMBER, STYLE_DOC_NUMBER, STYLE_DOC_NUMBER_UP, STYLE_MARK,
+    STYLE_ORG_MARK, STYLE_RED_LINE, STYLE_SIGNER,
 };
 
 pub(crate) fn render(docx: &mut Docx, metadata: &Metadata, styles: &DocStyles) {
@@ -37,12 +38,33 @@ pub(crate) fn render(docx: &mut Docx, metadata: &Metadata, styles: &DocStyles) {
         }
     }
     docx.add_paragraph(organization_paragraph);
-    docx.add_paragraph(plain_paragraph(
+    docx.add_paragraph(document_number_paragraph(
         doc_number,
-        STYLE_DOC_NUMBER,
-        styles.run(STYLE_DOC_NUMBER),
+        string_field(metadata, "signer"),
+        styles,
     ));
     docx.add_paragraph(Paragraph::styled(STYLE_RED_LINE));
+}
+
+/// Downward documents centre the document number; upward ones put it flush
+/// left with one character of indent and place "签发人：姓名" on the same line,
+/// one character from the right edge (GB/T 9704-2012 7.2.5, 7.2.6).
+fn document_number_paragraph(
+    doc_number: &str,
+    signer: Option<&str>,
+    styles: &DocStyles,
+) -> Paragraph {
+    let Some(signer) = signer else {
+        return plain_paragraph(doc_number, STYLE_DOC_NUMBER, styles.run(STYLE_DOC_NUMBER));
+    };
+    let number = styles.run(STYLE_DOC_NUMBER_UP);
+    let mut paragraph = plain_paragraph(doc_number, STYLE_DOC_NUMBER_UP, number);
+    paragraph.runs.push(styled_run("\t", number));
+    paragraph.runs.push(styled_run("签发人：", number));
+    paragraph
+        .runs
+        .push(styled_run(signer, styles.run(STYLE_SIGNER)));
+    paragraph
 }
 
 /// The red header keeps its 36 pt height; names wider than the text column are
