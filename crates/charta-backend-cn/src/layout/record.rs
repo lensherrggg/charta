@@ -1,7 +1,9 @@
 //! 版记: the dedicated last section and the copy/issuing record table.
 
 use charta::Metadata;
-use charta_docx_kit::{BodyItem, Docx, SectionBreak, Table, TableCell, TableRow};
+use charta_docx_kit::{
+    BodyItem, Docx, Paragraph, SectionBreak, Spacing, Table, TableCell, TableRow,
+};
 
 use crate::layout::text::plain_paragraph;
 use crate::layout::{chinese_date, list_field, string_field};
@@ -72,4 +74,11 @@ pub(crate) fn render(docx: &mut Docx, metadata: &Metadata, styles: &DocStyles) {
     table.cell_margin_mm = config.cell_margin_mm;
     table.width_mm = Some(config.width_mm);
     docx.add_table(table);
+
+    // A body ending in a table still needs a paragraph after it. Word would
+    // supply one at the default body size, lifting the record a full line off
+    // the text-area bottom; this 1 pt stand-in keeps it flush.
+    let mut trailer = Paragraph::new();
+    trailer.formatting.spacing = Spacing::exact(1.0);
+    docx.add_paragraph(trailer);
 }

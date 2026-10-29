@@ -314,6 +314,9 @@ fn record_section_starts_on_even_page_without_page_numbers() {
     assert!(record.contains(&format!("r:id=\"{id}\"")));
     let blank = part(&output.docx, "word/footer-blank.xml");
     assert!(blank.contains("<w:p></w:p>"));
+    assert!(body.contains(
+        "</w:tbl><w:p><w:pPr><w:spacing w:line=\"20\" w:lineRule=\"exact\"/></w:pPr></w:p>"
+    ));
 }
 
 const PNG_1X1: &[u8] = &[
