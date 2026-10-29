@@ -28,7 +28,7 @@ fn report(path: &Path) -> Value {
     serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap()
 }
 
-const VALID_MD: &str = "---\ntitle: 测试通知\ndoc_number: 测试〔2026〕1号\nissuer: 测试单位\ndate: 2026-10-25\n---\n\n# 一、正文\n\n这是正文。\n";
+const VALID_MD: &str = "---\ndoc_number: 测试〔2026〕1号\nissuer: 测试单位\ndate: 2026-10-25\n---\n\n# 测试通知\n\n## 一、正文\n\n这是正文。\n";
 
 #[test]
 fn converts_markdown_and_writes_all_outputs() {
@@ -120,7 +120,7 @@ fn no_header_and_no_record_allow_plain_documents() {
     let report_json = dir.join("plain.report.json");
     fs::write(
         &input,
-        "---\ntitle: 测试通知\nissuer: 测试单位\ndate: 2026-10-25\ncc:\n  - 某单位\n---\n\n正文。\n",
+        "---\nissuer: 测试单位\ndate: 2026-10-25\ncc:\n  - 某单位\n---\n\n# 测试通知\n\n正文。\n",
     )
     .unwrap();
 
@@ -384,7 +384,7 @@ fn version_backends_and_schema_commands_work() {
     assert_ok(&schema);
     let stdout = String::from_utf8_lossy(&schema.stdout);
     assert!(stdout.contains("doc_number"));
-    assert!(stdout.contains("title"));
+    assert!(!stdout.contains("title"));
 
     let schema_json = charta()
         .args(["schema", "--backend", "gb9704", "--json"])

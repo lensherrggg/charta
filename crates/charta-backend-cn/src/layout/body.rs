@@ -32,27 +32,58 @@ pub(crate) fn render_main(
     styles: &DocStyles,
     issues: &mut Vec<Issue>,
 ) {
-    let title = string_field(metadata, "title").unwrap_or_default();
-    docx.add_paragraph(plain_paragraph(title, STYLE_TITLE, styles.run(STYLE_TITLE)));
-    if let Some(recipient) = string_field(metadata, "recipient") {
-        docx.add_paragraph(plain_paragraph(
-            &with_colon(recipient),
-            STYLE_RECIPIENT,
-            styles.run(STYLE_RECIPIENT),
-        ));
-    }
-
     let mut numbers = NumberingState::default();
-    render_blocks(
-        blocks,
-        docx,
-        options,
-        styles,
-        issues,
-        &mut numbers,
-        false,
-        DocTemplate::Notice,
-    );
+    let title_index = blocks
+        .iter()
+        .position(|block| matches!(&block.kind, BlockKind::Heading { level: 1, .. }));
+    match title_index {
+        Some(index) => {
+            render_blocks(
+                &blocks[..index],
+                docx,
+                options,
+                styles,
+                issues,
+                &mut numbers,
+                false,
+                DocTemplate::Notice,
+            );
+            render_blocks(
+                &blocks[index..=index],
+                docx,
+                options,
+                styles,
+                issues,
+                &mut numbers,
+                false,
+                DocTemplate::Notice,
+            );
+            add_recipient(docx, metadata, styles);
+            render_blocks(
+                &blocks[index + 1..],
+                docx,
+                options,
+                styles,
+                issues,
+                &mut numbers,
+                false,
+                DocTemplate::Notice,
+            );
+        }
+        None => {
+            add_recipient(docx, metadata, styles);
+            render_blocks(
+                blocks,
+                docx,
+                options,
+                styles,
+                issues,
+                &mut numbers,
+                false,
+                DocTemplate::Notice,
+            );
+        }
+    }
 
     if let Some(attachments) = list_field(metadata, "attachments") {
         let mut text = String::from("附件：");
@@ -82,6 +113,16 @@ pub(crate) fn render_main(
             &with_parentheses(note),
             STYLE_NOTE,
             styles.run(STYLE_NOTE),
+        ));
+    }
+}
+
+fn add_recipient(docx: &mut Docx, metadata: &Metadata, styles: &DocStyles) {
+    if let Some(recipient) = string_field(metadata, "recipient") {
+        docx.add_paragraph(plain_paragraph(
+            &with_colon(recipient),
+            STYLE_RECIPIENT,
+            styles.run(STYLE_RECIPIENT),
         ));
     }
 }
@@ -290,17 +331,15 @@ fn render_blocks(
                 let (style_id, style) = if quote {
                     (STYLE_QUOTE, styles.run(STYLE_QUOTE))
                 } else {
-                    heading_style(*level, styles, template)
+                    heading_style(*level, styles)
                 };
-                if matches!(template, DocTemplate::General | DocTemplate::Compilation)
-                    && *level == 1
-                {
+                if !quote && *level == 1 {
                     numbers.heading_num_id = None;
                     numbers.headings.reset();
                 }
                 let mut paragraph =
                     styled_paragraph(style_id, content, style, options, styles, issues);
-                if !quote && matches!(template, DocTemplate::General | DocTemplate::Compilation) {
+                if !quote {
                     paragraph.formatting.outline_level = Some(level.saturating_sub(1).min(8));
                 }
                 let numbering_requested = match auto_number {
@@ -310,7 +349,6 @@ fn render_blocks(
                 if numbering_requested {
                     apply_heading_numbering(
                         *level,
-                        template,
                         &block.source,
                         &mut paragraph,
                         style,
@@ -361,7 +399,6 @@ fn render_blocks(
 #[allow(clippy::too_many_arguments)]
 fn apply_heading_numbering(
     level: u8,
-    template: DocTemplate,
     source: &SourceSpan,
     paragraph: &mut Paragraph,
     style: &RunConfig,
@@ -370,14 +407,11 @@ fn apply_heading_numbering(
     issues: &mut Vec<Issue>,
     numbers: &mut NumberingState,
 ) {
-    let offset = match template {
-        DocTemplate::Notice => 0,
-        DocTemplate::General | DocTemplate::Compilation => 1,
-    };
-    if level <= offset {
+    // 所有模板的 # 都是大标题，不参与编号；## 起从 一、 开始。
+    if level <= 1 {
         return;
     }
-    let numbering_level = level - offset;
+    let numbering_level = level - 1;
     if !(1..=4).contains(&numbering_level) {
         if styles.heading_numbering().is_some() {
             if !numbers.heading_flattened_reported {
@@ -460,19 +494,12 @@ fn render_list(
     }
 }
 
-fn heading_style(
-    level: u8,
-    styles: &DocStyles,
-    template: DocTemplate,
-) -> (&'static str, &RunConfig) {
-    let style_id = match (template, level) {
-        (DocTemplate::General | DocTemplate::Compilation, 1) => STYLE_TITLE,
-        (DocTemplate::General | DocTemplate::Compilation, 2) => STYLE_HEADING1,
-        (DocTemplate::General | DocTemplate::Compilation, 3) => STYLE_HEADING2,
-        (DocTemplate::General | DocTemplate::Compilation, _) => STYLE_HEADING3,
-        (DocTemplate::Notice, 1) => STYLE_HEADING1,
-        (DocTemplate::Notice, 2) => STYLE_HEADING2,
-        (DocTemplate::Notice, _) => STYLE_HEADING3,
+fn heading_style(level: u8, styles: &DocStyles) -> (&'static str, &RunConfig) {
+    let style_id = match level {
+        1 => STYLE_TITLE,
+        2 => STYLE_HEADING1,
+        3 => STYLE_HEADING2,
+        _ => STYLE_HEADING3,
     };
     (style_id, styles.run(style_id))
 }

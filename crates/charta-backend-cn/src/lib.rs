@@ -210,12 +210,18 @@ impl Backend for Gb9704Backend {
                 "通知属于下行文，不渲染签发人；上行文后端再实现",
             ));
         }
+        if metadata.get("title").is_some() {
+            issues.push(report::ignored_metadata(
+                "title",
+                "通知以正文第一个一级标题作为大标题，元数据 title 不参与渲染",
+            ));
+        }
         issues.extend(option_ignored_metadata(metadata, &self.options));
         let mut docx = Docx::new();
         docx.page = self.styles.page().setup();
         docx.styles = self.styles.stylesheet();
         docx.core = CoreProperties {
-            title: layout::string_field(metadata, "title").map(str::to_owned),
+            title: layout::body::first_title(&request.document.blocks),
             creator: layout::string_field(metadata, "organization")
                 .or_else(|| layout::string_field(metadata, "issuer"))
                 .map(str::to_owned),

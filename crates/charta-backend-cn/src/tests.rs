@@ -22,7 +22,6 @@ fn intent(property: StyleProperty) -> StyleIntent {
 
 fn metadata() -> Metadata {
     let mut metadata = Metadata::new();
-    metadata.insert("title", "关于开展 2026 年度公文格式检查的通知");
     metadata.insert("doc_number", "昆政发〔2026〕1号");
     metadata.insert("issuer", "昆山市人民政府");
     metadata.insert("date", "2026-10-25");
@@ -85,7 +84,12 @@ fn document() -> Document {
     };
 
     let blocks = vec![
-        Block::heading(1, vec![Inline::text("一、总体要求", span())], span()),
+        Block::heading(
+            1,
+            vec![Inline::text("关于开展 2026 年度公文格式检查的通知", span())],
+            span(),
+        ),
+        Block::heading(2, vec![Inline::text("一、总体要求", span())], span()),
         Block::paragraph(
             vec![
                 Inline::text("请各单位", span()),
@@ -234,6 +238,30 @@ fn renders_complete_notice() {
     assert!(output.issues.iter().any(|issue| matches!(
         &issue.details,
         IssueDetails::RenderWarning { code, .. } if code == "degraded_content"
+    )));
+}
+
+#[test]
+fn notice_title_comes_from_first_level_one_heading() {
+    let mut document = document();
+    document.metadata.insert("title", "元数据标题");
+    let output = Gb9704Backend::new()
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let body = part(&output.docx, "word/document.xml");
+    let core = part(&output.docx, "docProps/core.xml");
+    assert!(body.contains(&format!("<w:pStyle w:val=\"{STYLE_TITLE}\"/>")));
+    assert!(body.contains("关于开展 2026 年度公文格式检查的通知"));
+    assert!(!body.contains("元数据标题"));
+    assert!(core.contains("<dc:title>关于开展 2026 年度公文格式检查的通知</dc:title>"));
+    assert!(body.contains("<w:outlineLvl w:val=\"0\"/>"));
+    assert!(body.contains("<w:outlineLvl w:val=\"1\"/>"));
+    assert!(output.issues.iter().any(|issue| matches!(
+        &issue.details,
+        IssueDetails::RenderWarning { code, .. } if code == "metadata_ignored"
     )));
 }
 
@@ -1086,12 +1114,13 @@ fn lists_fall_back_to_body_at_fifth_level() {
 
 fn numbered_headings() -> Vec<Block> {
     vec![
-        Block::heading(1, vec![Inline::text("范围", span())], span()).with_auto_number(true),
-        Block::heading(2, vec![Inline::text("对象", span())], span()).with_auto_number(true),
-        Block::heading(3, vec![Inline::text("细则", span())], span()).with_auto_number(true),
-        Block::heading(4, vec![Inline::text("条目", span())], span()).with_auto_number(true),
-        Block::heading(2, vec![Inline::text("再对象", span())], span()).with_auto_number(true),
-        Block::heading(5, vec![Inline::text("五级", span())], span()).with_auto_number(true),
+        Block::heading(1, vec![Inline::text("测试标题", span())], span()),
+        Block::heading(2, vec![Inline::text("范围", span())], span()).with_auto_number(true),
+        Block::heading(3, vec![Inline::text("对象", span())], span()).with_auto_number(true),
+        Block::heading(4, vec![Inline::text("细则", span())], span()).with_auto_number(true),
+        Block::heading(5, vec![Inline::text("条目", span())], span()).with_auto_number(true),
+        Block::heading(3, vec![Inline::text("再对象", span())], span()).with_auto_number(true),
+        Block::heading(6, vec![Inline::text("五级", span())], span()).with_auto_number(true),
     ]
 }
 
@@ -1164,9 +1193,10 @@ fn heading_numbering_uses_word_multilevel_list() {
 #[test]
 fn explicitly_unnumbered_headings_skip_native_numbering() {
     let blocks = vec![
-        Block::heading(1, vec![Inline::text("第一", span())], span()).with_auto_number(true),
-        Block::heading(1, vec![Inline::text("手写序号", span())], span()).with_auto_number(false),
-        Block::heading(1, vec![Inline::text("第三", span())], span()).with_auto_number(true),
+        Block::heading(1, vec![Inline::text("测试标题", span())], span()),
+        Block::heading(2, vec![Inline::text("第一", span())], span()).with_auto_number(true),
+        Block::heading(2, vec![Inline::text("手写序号", span())], span()).with_auto_number(false),
+        Block::heading(2, vec![Inline::text("第三", span())], span()).with_auto_number(true),
     ];
     let document = Document::new(FrontendId::Markdown, metadata()).with_blocks(blocks);
     let output = Gb9704Backend::new()

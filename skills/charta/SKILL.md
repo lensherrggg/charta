@@ -61,7 +61,7 @@ Windows 下可执行文件是 `charta.exe`，参数相同。
 
 | 体裁 | 后端 | 必填元数据 | 说明 |
 |---|---|---|---|
-| 正式通知 | `gb9704` | `title`、`doc_number`、`issuer`、`date` | 版头、版记、28 磅行距、页码；`organization`/`recipient`/`cc`/`attachments` 等可选 |
+| 正式通知 | `gb9704` | `doc_number`、`issuer`、`date` | 首个 `#` 即大标题；版头、版记、28 磅行距、页码；`organization`/`recipient`/`cc`/`attachments` 等可选 |
 | 一般材料 | `general` | 无 | 首个 `#` 即大标题；`author`、`date`、`recipient` 都可选 |
 | 多篇汇编 | `compilation` | `title`、`date` | 封面 + 目录 + 正文；`date_style: chinese` 可把封面日期写成汉字 |
 
@@ -71,13 +71,14 @@ Windows 下可执行文件是 `charta.exe`，参数相同。
 
 | 源文件写法 | `gb9704` | `general` | `compilation` |
 |---|---|---|---|
-| `#` | 一、 | 大标题（不编号） | 篇章标题（不编号，另起一页） |
-| `##` | （一） | 一、 | 一、 |
-| `###` | 1. | （一） | （一） |
-| `####` | （1） | 1. | 1. |
-| `#####` | 超过四级，告警 | （1） | （1） |
+| `#` | 大标题（不编号） | 大标题（不编号） | 篇章标题（不编号，另起一页） |
+| `##` | 一、 | 一、 | 一、 |
+| `###` | （一） | （一） | （一） |
+| `####` | 1. | 1. | 1. |
+| `#####` | （1） | （1） | （1） |
+| `######` | 超过四级，告警 | 超过四级，告警 | 超过四级，告警 |
 
-- `general` 只把正文第一个 `#` 当大标题，不要再用元数据 `title`。
+- `gb9704` 和 `general` 都只把正文第一个 `#` 当大标题，不要再用元数据 `title`。
 - `compilation` 的每个 `#` 是独立篇章，其后编号从 `一、` 重新开始。
 - 自动编号：`gb9704` 和 `general` 默认关闭，`_charta.heading_numbering: true` 开启；`compilation` 默认开启，`false` 关闭。不开启时请自己写“一、”等序号。
 
@@ -93,7 +94,7 @@ Markdown：
 
 Typst：
 
-- 元数据写在主文件第一个非空行：`#let charta-meta = (title: "…", date: "2026-10-25")`。`#let` 不产生输出，源文件仍可被 Typst 直接编译。
+- 元数据写在主文件第一个非空行：`#let charta-meta = (issuer: "昆山市人民政府", date: "2026-10-25")`。标题在正文用 `= 公文标题` 给。`#let` 不产生输出，源文件仍可被 Typst 直接编译。
 - `=`/`==` 等标题与 Markdown 的 `#` 层级对应；字面量 `include` 会展开，`#image(...)`、`#figure(...)`、受限 `#table(...)` 可用。
 - 循环、条件、`#set`、`#show`、`#import`、动态表格参数等不可静态确定的内容会降级并告警。
 

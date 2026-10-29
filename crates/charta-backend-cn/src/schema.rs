@@ -6,7 +6,6 @@ use charta::{FieldSchema, MetadataSchema};
 
 pub(crate) fn build_schema(header: bool) -> MetadataSchema {
     MetadataSchema::new(vec![
-        FieldSchema::string("title", true).describe("公文标题（2 号小标宋）"),
         FieldSchema::string("doc_number", header)
             .describe("发文字号，例如 昆政发〔2026〕1 号；关闭版头时不必填"),
         FieldSchema::string("issuer", true).describe("发文机关署名"),
