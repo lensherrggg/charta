@@ -14,6 +14,12 @@ pub struct Docx {
     /// Ask Word to refresh fields (e.g. TOC page numbers) when the document
     /// opens.
     pub update_fields: bool,
+    /// Whether the final section carries footers; false hides page numbers on
+    /// a trailing section such as the record page.
+    pub final_section_footer: bool,
+    /// Start the final section on an even page (`w:type="evenPage"`), letting
+    /// Word insert a blank page when needed.
+    pub final_section_even_page: bool,
 }
 
 impl Default for Docx {
@@ -33,6 +39,8 @@ impl Docx {
             core: CoreProperties::default(),
             images: Vec::new(),
             update_fields: false,
+            final_section_footer: true,
+            final_section_even_page: false,
         }
     }
 

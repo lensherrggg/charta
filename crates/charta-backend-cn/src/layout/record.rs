@@ -14,6 +14,11 @@ pub(crate) fn render(docx: &mut Docx, metadata: &Metadata, styles: &DocStyles) {
         footer: true,
     }));
     docx.page.vertical_alignment = styles.page().version_record_vertical_alignment;
+    // The record sits alone on the last page: it must start on an even page
+    // (the final printed side) and neither it nor a preceding blank page
+    // carries a page number.
+    docx.final_section_even_page = true;
+    docx.final_section_footer = false;
 
     let issuer = string_field(metadata, "issuer").unwrap_or_default();
     let date = string_field(metadata, "date").unwrap_or_default();

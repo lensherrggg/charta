@@ -255,6 +255,39 @@ fn signature_offset_uses_trailing_spaces() {
     assert!(body.contains("<w:wordWrap w:val=\"0\"/>"));
 }
 
+#[test]
+fn record_section_starts_on_even_page_without_page_numbers() {
+    let document = document();
+    let output = Gb9704Backend::new()
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let body = part(&output.docx, "word/document.xml");
+    let sections: Vec<&str> = body
+        .split("<w:sectPr>")
+        .skip(1)
+        .filter_map(|section| section.split("</w:sectPr>").next())
+        .collect();
+    assert_eq!(sections.len(), 2);
+    let record = sections[1];
+    assert!(record.contains("<w:type w:val=\"evenPage\"/>"));
+    let rels = part(&output.docx, "word/_rels/document.xml.rels");
+    let rel = rels
+        .split("<Relationship ")
+        .find(|rel| rel.contains("footer-blank.xml"))
+        .expect("blank footer relationship");
+    let id = rel
+        .split("Id=\"")
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .expect("relationship id");
+    assert!(record.contains(&format!("r:id=\"{id}\"")));
+    let blank = part(&output.docx, "word/footer-blank.xml");
+    assert!(blank.contains("<w:p></w:p>"));
+}
+
 const PNG_1X1: &[u8] = &[
     0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
     0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,

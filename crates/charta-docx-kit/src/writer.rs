@@ -113,6 +113,19 @@ pub(crate) fn write(docx: &Docx) -> Result<Vec<u8>> {
         );
     }
 
+    // A trailing section without its own footer would inherit the previous
+    // section's footer, so give it an explicit empty one.
+    let mut blank_refs = FooterRefs::default();
+    if !docx.final_section_footer {
+        let id = format!("rId{next_rel}");
+        next_rel += 1;
+        let file = "footer-blank.xml".to_owned();
+        relationships.push((id.clone(), REL_FOOTER.to_owned(), file.clone()));
+        footer_parts.push((file, empty_footer_xml()));
+        blank_refs.default = Some(id.clone());
+        blank_refs.even = Some(id);
+    }
+
     let settings_id = format!("rId{next_rel}");
     relationships.push((
         settings_id.clone(),
@@ -120,7 +133,12 @@ pub(crate) fn write(docx: &Docx) -> Result<Vec<u8>> {
         "settings.xml".to_owned(),
     ));
 
-    let document = document_xml(docx, &refs, &image_refs);
+    let final_refs = if docx.final_section_footer {
+        &refs
+    } else {
+        &blank_refs
+    };
+    let document = document_xml(docx, &refs, final_refs, &image_refs);
     let styles = styles_xml(docx);
     let settings = settings_xml(docx.footers.even.is_some(), docx.update_fields);
 
@@ -227,7 +245,12 @@ fn add_footer(
     }
 }
 
-fn document_xml(docx: &Docx, refs: &FooterRefs, image_refs: &[ImageRef]) -> String {
+fn document_xml(
+    docx: &Docx,
+    refs: &FooterRefs,
+    final_refs: &FooterRefs,
+    image_refs: &[ImageRef],
+) -> String {
     let mut drawing_id = 0u32;
     let mut body = String::new();
     for item in &docx.body {
@@ -260,7 +283,11 @@ fn document_xml(docx: &Docx, refs: &FooterRefs, image_refs: &[ImageRef]) -> Stri
             }
         }
     }
-    let final_sect = sect_pr_xml(&docx.page, refs, None);
+    let final_sect = sect_pr_xml(
+        &docx.page,
+        final_refs,
+        docx.final_section_even_page.then_some("evenPage"),
+    );
     format!(
         "{XML_DECL}<w:document xmlns:w=\"{NS_W}\" xmlns:r=\"{NS_R}\"><w:body>{body}{final_sect}</w:body></w:document>"
     )
@@ -683,6 +710,10 @@ fn footer_xml(footer: &Footer, image_refs: &[ImageRef]) -> String {
     }
     xml.push_str("</w:ftr>");
     xml
+}
+
+fn empty_footer_xml() -> String {
+    format!("{XML_DECL}<w:ftr xmlns:w=\"{NS_W}\"><w:p></w:p></w:ftr>")
 }
 
 fn settings_xml(even_and_odd: bool, update_fields: bool) -> String {
