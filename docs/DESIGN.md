@@ -1,6 +1,6 @@
 # Charta 设计文档
 
-- 引擎版本：`0.1.0`
+- 引擎版本：`0.2.0`
 - IR 格式：`1.1`
 - 报告格式：`1.0`
 - 适用：第一期 MVP（Markdown / Typst → IR → GB/T 9704 通知 → docx + 报告）
@@ -508,7 +508,7 @@ API 以公开数据模型为主，后端可完全绕开某个 helper 直接构�
 ```json
 {
   "report_version": "1.0",
-  "engine_version": "0.1.0",
+  "engine_version": "0.2.0",
   "source": "examples/degraded.typ",
   "frontend": "typst",
   "backend": "gb9704",

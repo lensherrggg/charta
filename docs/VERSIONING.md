@@ -4,10 +4,10 @@
 
 | 对象 | 版本 | 说明 |
 |---|---|---|
-| workspace / 全部 crate | `0.1.0` | 引擎与工具链版本，单一来源 |
+| workspace / 全部 crate | `0.2.0` | 引擎与工具链版本，单一来源 |
 | IR 格式 | `1.1` | `charta::IR_VERSION`，JSON 契约 |
 | 报告格式 | `1.0` | `charta::REPORT_VERSION`，JSON 契约 |
-| CLI | `0.1.0` | 与 workspace 同步 |
+| CLI | `0.2.0` | 与 workspace 同步 |
 
 ## 单一来源
 
@@ -22,7 +22,7 @@
 - **1.0 之后**：核心 crate 遵循 SemVer；删除/重命名公开类型、trait 方法或 JSON 字段属于破坏性变更。
 - **IR 格式**：新增可选字段为兼容变更；删除字段、改变字段含义或改变节点结构必须递增 `IR_VERSION` 主版本。
 - **报告格式**：`IssueDetails` 新增变体或字段为兼容变更；已有字段改名/删除或 severity 语义变化必须递增 `REPORT_VERSION` 主版本。
-- **docx-kit**：与核心保持同一 minor 系列（0.1.x 对应核心 0.1.x）；作为独立 crate 可被其他项目单独依赖。
+- **docx-kit**：与核心保持同一 minor 系列（0.2.x 对应核心 0.2.x）；作为独立 crate 可被其他项目单独依赖。
 
 ## 版本递增流程
 

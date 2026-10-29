@@ -81,7 +81,7 @@ checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
 name = "charta"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -90,7 +90,7 @@ dependencies = [
 
 [[package]]
 name = "charta-backend-cn"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "charta",
  "charta-docx-kit",
@@ -101,7 +101,7 @@ dependencies = [
 
 [[package]]
 name = "charta-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "charta",
  "charta-backend-cn",
@@ -113,7 +113,7 @@ dependencies = [
 
 [[package]]
 name = "charta-docx-kit"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "thiserror",
  "zip",
@@ -121,7 +121,7 @@ dependencies = [
 
 [[package]]
 name = "charta-md"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "charta",
  "serde_json",
@@ -129,7 +129,7 @@ dependencies = [
 
 [[package]]
 name = "charta-typst"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "charta",
 ]

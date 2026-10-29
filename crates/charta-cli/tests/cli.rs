@@ -365,7 +365,7 @@ fn converts_compilation_with_cover_and_toc() {
 fn version_backends_and_schema_commands_work() {
     let version = charta().arg("--version").output().unwrap();
     assert_ok(&version);
-    assert!(String::from_utf8_lossy(&version.stdout).contains("0.1.0"));
+    assert!(String::from_utf8_lossy(&version.stdout).contains("0.2.0"));
 
     let backends = charta().arg("backends").output().unwrap();
     assert_ok(&backends);

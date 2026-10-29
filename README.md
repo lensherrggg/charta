@@ -2,7 +2,7 @@
 
 Charta（拉丁语 *charta*，纸、文书）是一个以**语义 IR** 为核心的 docx 生成引擎。前端只负责写内容、填元数据；视觉形态由规范后端决定；样式意图与静态不可确定性都会进入审计报告。
 
-当前版本：**0.1.0**（第一期 MVP）
+当前版本：**0.2.0**
 
 - IR 格式：`1.1`
 - 报告格式：`1.0`
@@ -514,7 +514,7 @@ severity 为 `blocking` 或 `warning`。默认只有 schema 校验（含 `charta
 - 递增版本：`bash scripts/bump-version.sh 0.2.0`，然后更新 `CHANGELOG.md` 并执行发布检查。
 - 详见 [docs/VERSIONING.md](docs/VERSIONING.md)。
 
-## 已知限制（0.1.0）
+## 已知限制（0.2.0）
 
 - 已提供 GB/T 9704 通知与通用材料两个后端；会议纪要、请示、函、企业公文后端在后续阶段。
 - 通用材料后端以 Markdown 使用为主；表格题注的后端渲染已存在，但 Markdown 语法入口尚未实现。
