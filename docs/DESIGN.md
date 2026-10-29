@@ -55,7 +55,7 @@
 | `charta-md` | Markdown 受控子集 → IR | `charta` |
 | `charta-typst` | Typst 只读 CST 子集 → IR | `charta` |
 | `charta-docx-kit` | OOXML 机械操作与 zip 打包 | zip、thiserror |
-| `charta-backend-gb9704` | GB/T 9704 通知版式与渲染 | `charta`、`charta-docx-kit` |
+| `charta-backend-cn` | 中文公文模板：通知、通用材料、文件汇编 | `charta`、`charta-docx-kit` |
 | `charta-cli` | 参数解析、文件读写、退出码 | 全部上层 crate、clap |
 
 `charta` 不依赖任何前端、后端或 docx 库；新增后端不需要修改核心。
@@ -376,7 +376,7 @@ pub trait Backend: Send + Sync {
 
 版式元素全部由后端根据自身样式数据生成，不读取任何 `.docx` 模板。字体名称按国标写入；是否可用取决于运行环境。
 
-版头与版记是后端版面选项（`Gb9704Options::header` / `record`），默认开启，关闭不改变 IR。关闭版头后文档从标题开始，`doc_number` 不再必填，仍提供的版头专属元数据报告 `metadata_ignored`；关闭版记后取消末节分节与沉底，短公文不再因此多页，`cc`、`issuing_office`、`issuing_date` 若仍提供同样报告忽略。页码不受两个开关影响。
+版头与版记是后端版面选项（`DocOptions::header` / `record`），默认开启，关闭不改变 IR。关闭版头后文档从标题开始，`doc_number` 不再必填，仍提供的版头专属元数据报告 `metadata_ignored`；关闭版记后取消末节分节与沉底，短公文不再因此多页，`cc`、`issuing_office`、`issuing_date` 若仍提供同样报告忽略。页码不受两个开关影响。
 
 列表序数与标题层级解耦：每个列表独立从第一级开始，有序列表的 `start` 用于起始序号；四级以内分别生成 `（1）`、`①`、`A.`、`a.` 静态文本序数，第五级起按普通正文段落渲染并报告 `list_nesting_flattened`。列表不使用 `numbering.xml`，避免列表编号与标题多级列表共用编号状态；标题请求自动编号时只给标题段落挂 `numPr`。
 
@@ -392,7 +392,7 @@ pub trait Backend: Send + Sync {
 
 **FR-BE-6（数据格式）**：样式数据文件的格式由后端自行决定，引擎不规定；引擎只依赖后端的 `Backend` 契约，不读取或校验样式数据文件。
 
-0.1.0 落地情况：已满足 FR-BE-5。GB/T 9704 通知后端的样式值集中在 `crates/charta-backend-gb9704/data/styles.json`，通用材料后端使用同目录的 `general-styles.json`，两者共用加载与校验逻辑、按各自必需样式集校验；采用带 `schema` 版本号的 JSON（本后端自定格式）。文件覆盖：
+0.1.0 落地情况：已满足 FR-BE-5。GB/T 9704 通知后端的样式值集中在 `crates/charta-backend-cn/data/styles.json`，通用材料后端使用同目录的 `general-styles.json`，两者共用加载与校验逻辑、按各自必需样式集校验；采用带 `schema` 版本号的 JSON（本后端自定格式）。文件覆盖：
 
 - 页面尺寸、页边距、页眉页脚距、正文/版记页的垂直对齐
 - 段落样式：对齐、固定行距、段前段后、缩进、`keepNext`、边框
@@ -405,7 +405,7 @@ pub trait Backend: Send + Sync {
 
 渲染流程只按样式 ID 取 `RunConfig` / `TableConfig` / `VersionRecordConfig` / `FooterConfig` 并套用，不再内联样式值。列表静态序数 `（1）`、`①`、`A.`、`a.` 属于 FR-BE-5 的例外，保留在流程逻辑中。标题使用 Word 自动编号时，抽象编号、层级格式、层级文本与缩进已外置到 `numbering.heading`，由 `charta-docx-kit` 写入 `numbering.xml`；样式数据缺少该段时回退静态编号并报告。
 
-加载入口为 `Gb9704Styles::embedded_for` / `from_json_for` / `from_path_for`，按 `StyleSet::Notice` 或 `StyleSet::General` 选择必需样式集；`from_external_for` 自动识别完整文件与补丁，`from_json_with_patch` 把补丁应用到调用方给定的基础数据；`embedded` / `from_json` / `from_path` 是通知样式集的简写。后端可用 `with_styles` / `with_style_file` 接收外部数据，通用材料后端会再次调用 `validate(StyleSet::General)`，防止把通知样式集误用于通用模板。加载时校验 `schema`、重复/缺失样式、`based_on` 指向、颜色引用、必需 `run`、数值范围，并拒绝未知字段和未知枚举值；失败直接返回错误，不做静默回退。样式数据随后端 crate 发布并与后端版本绑定，不进入 IR，引擎核心也不读取或校验该文件。
+加载入口为 `DocStyles::embedded_for` / `from_json_for` / `from_path_for`，按 `StyleSet::Notice` 或 `StyleSet::General` 选择必需样式集；`from_external_for` 自动识别完整文件与补丁，`from_json_with_patch` 把补丁应用到调用方给定的基础数据；`embedded` / `from_json` / `from_path` 是通知样式集的简写。后端可用 `with_styles` / `with_style_file` 接收外部数据，通用材料后端会再次调用 `validate(StyleSet::General)`，防止把通知样式集误用于通用模板。加载时校验 `schema`、重复/缺失样式、`based_on` 指向、颜色引用、必需 `run`、数值范围，并拒绝未知字段和未知枚举值；失败直接返回错误，不做静默回退。样式数据随后端 crate 发布并与后端版本绑定，不进入 IR，引擎核心也不读取或校验该文件。
 
 局部样式覆盖由外部补丁实现：`--styles` 指向的文件若 `styles` 是对象（按样式 ID 索引），就与当前后端的内置数据递归合并；若 `styles` 是数组，则视为完整样式文件并整份替换。合并支持 `styles[*].run`、`styles[*].paragraph`、`defaults`、`numbering`、`page`、`table`、`image`、`version_record`、`footer` 和 `colors`，未写的键保持基础值。
 
@@ -415,7 +415,7 @@ pub trait Backend: Send + Sync {
 
 ### 6.7 后端内部结构
 
-规范后端不是配置文件，也不是纯代码，而是“契约实现 + 数据 + 流程 + 报告”的 crate。GB/T 9704 后端按职责拆分：
+规范后端不是配置文件，也不是纯代码，而是“契约实现 + 数据 + 流程 + 报告”的 crate。`charta-backend-cn` 承载通知、通用材料和文件汇编三个模板，按职责拆分：
 
 | 路径 | 职责 |
 |---|---|
@@ -437,7 +437,7 @@ pub trait Backend: Send + Sync {
 
 ### 6.8 通用材料模板（general）
 
-`general` 与通知共用同一个后端 crate 和 `layout/` 流程，通过 `Gb9704Template::General` 选择。CLI 默认后端是 `general`；库层 `Gb9704Options::default()` 与 `Gb9704Backend` 仍以 `Notice` 为准，需要完整通知时由调用方或 CLI 显式选择。
+`general` 与通知共用同一个后端 crate 和 `layout/` 流程，通过 `DocTemplate::General` 选择。CLI 默认后端是 `general`；库层 `DocOptions::default()` 与 `Gb9704Backend` 仍以 `Notice` 为准，需要完整通知时由调用方或 CLI 显式选择。
 
 - 无版头、无版记；页面设置、页码、列表、表格、图片与题注流程复用。
 - 元数据：`author`、`date`、`recipient` 均可选，两个署名项都不填时不生成署名区。大标题取自正文第一个一级标题（`#`），元数据不再提供 `title`；若仍提供会报告 `metadata_ignored`。docx 的 `dc:title` 同样取该一级标题。
@@ -450,11 +450,11 @@ pub trait Backend: Send + Sync {
 - 行内强调：`strong` 使用 `GbStrong`（方正楷体_GBK 加粗），`emphasis` 使用 `GbEmphasis`（方正楷体_GBK 不加粗、不生成斜体）；通知模板保持原有行为。两套样式 ID 都来自样式数据，不在流程中内联字体名。
 - 样式外部化与局部微调：`GeneralBackend::with_style_file(path)` 按 `StyleSet::General` 加载完整文件或补丁；`--styles` 补丁可以只改 `GbBody` 的字号、`GbStrong` 的字体等单项。例如 `GbBody.run.size_step: 1` 把正文 16pt 提到 18pt，标题和表格保持原值；行内 `strong` 的字号跟随所在段落，字体和加粗取自 `GbStrong`。
 
-`Gb9704Options.template` 只影响行内强调与模板选择；通知的默认值不变，输出与加入通用材料前逐字节一致。
+`DocOptions.template` 只影响行内强调与模板选择；通知的默认值不变，输出与加入通用材料前逐字节一致。
 
 ### 6.9 文件汇编模板（compilation）
 
-`compilation` 与通用材料共用 `StyleSet::General` 样式集和正文流程，通过 `Gb9704Template::Compilation` 选择，额外生成封面和目录页。schema 要求 `title`、`date`，`date_style` 可选（`arabic` 默认，`chinese` 为汉字日期）。
+`compilation` 与通用材料共用 `StyleSet::General` 样式集和正文流程，通过 `DocTemplate::Compilation` 选择，额外生成封面和目录页。schema 要求 `title`、`date`，`date_style` 可选（`arabic` 默认，`chinese` 为汉字日期）。
 
 - 封面：5 个 `CoverSpacer` 空段 → `CoverTitle`（方正小标宋_GBK 二号，居中）→ 7 个空段 → `CoverDate`（方正楷体_GBK 二号，居中），三者行距均为 1.5 倍。`date_style: chinese` 输出 `二〇二六年十月二十五日`。
 - 目录：紧接封面的单独一页，`TocTitle`（“目　　录”，中间 2 个全角空格，方正小标宋_GBK 二号）+ `TOCSpacer`（三号字空行）+ Word TOC 域 `TOC \o "1-1" \h \z \u`；条目套 `TOC1`（方正楷体_GBK 三号、无缩进、单倍行距、段前段后 6 磅、156 mm 右对齐点线制表位），写入 `w:updateFields`。
@@ -464,7 +464,7 @@ pub trait Backend: Send + Sync {
 
 ### 6.10 pandoc reference.docx
 
-`Gb9704Styles::pandoc_reference_docx()` 用样式数据生成 pandoc 的 `reference.docx`；CLI 入口为 `charta reference`。pandoc 按 Word 内置样式 ID 取样式，而 Charta 的 `Gb*` ID 带规范语义，因此生成时只改 ID 与显示名，格式值全部沿用样式数据：
+`DocStyles::pandoc_reference_docx()` 用样式数据生成 pandoc 的 `reference.docx`；CLI 入口为 `charta reference`。pandoc 按 Word 内置样式 ID 取样式，而 Charta 的 `Gb*` ID 带规范语义，因此生成时只改 ID 与显示名，格式值全部沿用样式数据：
 
 - 映射：`GbTitle`→`Title`、`GbByline`→`Author`、`GbDate`→`Date`、`GbBody`→`BodyText`、`GbHeading1`–`3`→`Heading1`–`3`、`GbQuote`→`BlockText`、`GbTableCaption`→`TableCaption`、`GbImageCaption`→`ImageCaption`、`TocTitle`→`TOCHeading`。
 - 派生：`BodyText` 复制出 `FirstParagraph` 与 `Compact`（去掉首行缩进），`GbByline`（通用材料）复制出 `Date`，`Heading3` 复制出 `Heading4`–`Heading9`，避免 pandoc 的首段、紧凑列表、元数据日期和四级以下标题无样式可用。

@@ -16,20 +16,20 @@ use crate::layout::{chinese_date, list_field, string_field, with_colon, with_par
 use crate::numbering::{figure_label, list_marker, max_list_depth, NumberingState};
 use crate::report;
 use crate::styles::{
-    Gb9704Styles, RunConfig, STYLE_ATTACHMENT, STYLE_BODY, STYLE_BYLINE, STYLE_DATE,
-    STYLE_HEADING1, STYLE_HEADING2, STYLE_HEADING3, STYLE_IMAGE, STYLE_IMAGE_CAPTION, STYLE_ISSUER,
-    STYLE_NOTE, STYLE_QUOTE, STYLE_RECIPIENT, STYLE_TABLE_CAPTION, STYLE_TABLE_HEADER,
-    STYLE_TABLE_TEXT, STYLE_TITLE,
+    DocStyles, RunConfig, STYLE_ATTACHMENT, STYLE_BODY, STYLE_BYLINE, STYLE_DATE, STYLE_HEADING1,
+    STYLE_HEADING2, STYLE_HEADING3, STYLE_IMAGE, STYLE_IMAGE_CAPTION, STYLE_ISSUER, STYLE_NOTE,
+    STYLE_QUOTE, STYLE_RECIPIENT, STYLE_TABLE_CAPTION, STYLE_TABLE_HEADER, STYLE_TABLE_TEXT,
+    STYLE_TITLE,
 };
-use crate::Gb9704Options;
-use crate::Gb9704Template;
+use crate::DocOptions;
+use crate::DocTemplate;
 
 pub(crate) fn render_main(
     docx: &mut Docx,
     metadata: &Metadata,
     blocks: &[Block],
-    options: &Gb9704Options,
-    styles: &Gb9704Styles,
+    options: &DocOptions,
+    styles: &DocStyles,
     issues: &mut Vec<Issue>,
 ) {
     let title = string_field(metadata, "title").unwrap_or_default();
@@ -51,7 +51,7 @@ pub(crate) fn render_main(
         issues,
         &mut numbers,
         false,
-        Gb9704Template::Notice,
+        DocTemplate::Notice,
     );
 
     if let Some(attachments) = list_field(metadata, "attachments") {
@@ -98,8 +98,8 @@ pub(crate) fn render_general(
     docx: &mut Docx,
     metadata: &Metadata,
     blocks: &[Block],
-    options: &Gb9704Options,
-    styles: &Gb9704Styles,
+    options: &DocOptions,
+    styles: &DocStyles,
     issues: &mut Vec<Issue>,
 ) {
     let mut numbers = NumberingState::default();
@@ -116,7 +116,7 @@ pub(crate) fn render_general(
                 issues,
                 &mut numbers,
                 false,
-                Gb9704Template::General,
+                DocTemplate::General,
             );
             render_blocks(
                 &blocks[index..=index],
@@ -126,7 +126,7 @@ pub(crate) fn render_general(
                 issues,
                 &mut numbers,
                 false,
-                Gb9704Template::General,
+                DocTemplate::General,
             );
             add_general_preface(docx, metadata, styles);
             render_blocks(
@@ -137,7 +137,7 @@ pub(crate) fn render_general(
                 issues,
                 &mut numbers,
                 false,
-                Gb9704Template::General,
+                DocTemplate::General,
             );
         }
         None => {
@@ -150,7 +150,7 @@ pub(crate) fn render_general(
                 issues,
                 &mut numbers,
                 false,
-                Gb9704Template::General,
+                DocTemplate::General,
             );
         }
     }
@@ -159,8 +159,8 @@ pub(crate) fn render_general(
 pub(crate) fn render_compilation_content(
     docx: &mut Docx,
     blocks: &[Block],
-    options: &Gb9704Options,
-    styles: &Gb9704Styles,
+    options: &DocOptions,
+    styles: &DocStyles,
     issues: &mut Vec<Issue>,
 ) {
     // The cover and the TOC form their own section without a footer, so their
@@ -186,7 +186,7 @@ pub(crate) fn render_compilation_content(
             issues,
             &mut numbers,
             false,
-            Gb9704Template::Compilation,
+            DocTemplate::Compilation,
         );
         started = true;
     }
@@ -203,7 +203,7 @@ fn section_break(page: PageSetup, page_number_start: Option<u32>, footer: bool) 
     }
 }
 
-fn add_general_preface(docx: &mut Docx, metadata: &Metadata, styles: &Gb9704Styles) {
+fn add_general_preface(docx: &mut Docx, metadata: &Metadata, styles: &DocStyles) {
     let author = string_field(metadata, "author").unwrap_or_default();
     let date = chinese_date(string_field(metadata, "date").unwrap_or_default());
     let author = author.trim();
@@ -258,12 +258,12 @@ pub(crate) fn spaced_name(name: &str) -> String {
 fn render_blocks(
     blocks: &[Block],
     docx: &mut Docx,
-    options: &Gb9704Options,
-    styles: &Gb9704Styles,
+    options: &DocOptions,
+    styles: &DocStyles,
     issues: &mut Vec<Issue>,
     numbers: &mut NumberingState,
     quote: bool,
-    template: Gb9704Template,
+    template: DocTemplate,
 ) {
     for block in blocks {
         if let Determinism::NonDeterministic { reason, impact } = &block.determinism {
@@ -280,27 +280,20 @@ fn render_blocks(
                 } else {
                     heading_style(*level, styles, template)
                 };
-                if matches!(
-                    template,
-                    Gb9704Template::General | Gb9704Template::Compilation
-                ) && *level == 1
+                if matches!(template, DocTemplate::General | DocTemplate::Compilation)
+                    && *level == 1
                 {
                     numbers.heading_num_id = None;
                     numbers.headings.reset();
                 }
                 let mut paragraph =
                     styled_paragraph(style_id, content, style, options, styles, issues);
-                if !quote
-                    && matches!(
-                        template,
-                        Gb9704Template::General | Gb9704Template::Compilation
-                    )
-                {
+                if !quote && matches!(template, DocTemplate::General | DocTemplate::Compilation) {
                     paragraph.formatting.outline_level = Some(level.saturating_sub(1).min(8));
                 }
                 let numbering_requested = match auto_number {
                     Some(value) => *value,
-                    None => matches!(template, Gb9704Template::Compilation),
+                    None => matches!(template, DocTemplate::Compilation),
                 };
                 if numbering_requested {
                     apply_heading_numbering(
@@ -356,18 +349,18 @@ fn render_blocks(
 #[allow(clippy::too_many_arguments)]
 fn apply_heading_numbering(
     level: u8,
-    template: Gb9704Template,
+    template: DocTemplate,
     source: &SourceSpan,
     paragraph: &mut Paragraph,
     style: &RunConfig,
     docx: &mut Docx,
-    styles: &Gb9704Styles,
+    styles: &DocStyles,
     issues: &mut Vec<Issue>,
     numbers: &mut NumberingState,
 ) {
     let offset = match template {
-        Gb9704Template::Notice => 0,
-        Gb9704Template::General | Gb9704Template::Compilation => 1,
+        DocTemplate::Notice => 0,
+        DocTemplate::General | DocTemplate::Compilation => 1,
     };
     if level <= offset {
         return;
@@ -426,8 +419,8 @@ fn render_list(
     list: &ListBlock,
     depth: u32,
     docx: &mut Docx,
-    options: &Gb9704Options,
-    styles: &Gb9704Styles,
+    options: &DocOptions,
+    styles: &DocStyles,
     issues: &mut Vec<Issue>,
     source: &SourceSpan,
 ) {
@@ -457,17 +450,17 @@ fn render_list(
 
 fn heading_style(
     level: u8,
-    styles: &Gb9704Styles,
-    template: Gb9704Template,
+    styles: &DocStyles,
+    template: DocTemplate,
 ) -> (&'static str, &RunConfig) {
     let style_id = match (template, level) {
-        (Gb9704Template::General | Gb9704Template::Compilation, 1) => STYLE_TITLE,
-        (Gb9704Template::General | Gb9704Template::Compilation, 2) => STYLE_HEADING1,
-        (Gb9704Template::General | Gb9704Template::Compilation, 3) => STYLE_HEADING2,
-        (Gb9704Template::General | Gb9704Template::Compilation, _) => STYLE_HEADING3,
-        (Gb9704Template::Notice, 1) => STYLE_HEADING1,
-        (Gb9704Template::Notice, 2) => STYLE_HEADING2,
-        (Gb9704Template::Notice, _) => STYLE_HEADING3,
+        (DocTemplate::General | DocTemplate::Compilation, 1) => STYLE_TITLE,
+        (DocTemplate::General | DocTemplate::Compilation, 2) => STYLE_HEADING1,
+        (DocTemplate::General | DocTemplate::Compilation, 3) => STYLE_HEADING2,
+        (DocTemplate::General | DocTemplate::Compilation, _) => STYLE_HEADING3,
+        (DocTemplate::Notice, 1) => STYLE_HEADING1,
+        (DocTemplate::Notice, 2) => STYLE_HEADING2,
+        (DocTemplate::Notice, _) => STYLE_HEADING3,
     };
     (style_id, styles.run(style_id))
 }
@@ -485,8 +478,8 @@ fn render_image(
     image: &ImageBlock,
     source: &SourceSpan,
     docx: &mut Docx,
-    options: &Gb9704Options,
-    styles: &Gb9704Styles,
+    options: &DocOptions,
+    styles: &DocStyles,
     issues: &mut Vec<Issue>,
     figure_number: &mut u32,
 ) {
@@ -559,8 +552,8 @@ fn resolve_image_path(path: &str, source: &SourceSpan) -> PathBuf {
 fn render_table(
     table: &TableBlock,
     docx: &mut Docx,
-    options: &Gb9704Options,
-    styles: &Gb9704Styles,
+    options: &DocOptions,
+    styles: &DocStyles,
     issues: &mut Vec<Issue>,
     source: &SourceSpan,
 ) {
@@ -600,8 +593,8 @@ struct ActiveMerge {
 fn layout_table_rows(
     table: &TableBlock,
     columns: usize,
-    options: &Gb9704Options,
-    styles: &Gb9704Styles,
+    options: &DocOptions,
+    styles: &DocStyles,
     issues: &mut Vec<Issue>,
     source: &SourceSpan,
 ) -> Vec<TableRow> {
@@ -703,8 +696,8 @@ fn content_table_cell(
     table: &TableBlock,
     column: usize,
     header: bool,
-    options: &Gb9704Options,
-    styles: &Gb9704Styles,
+    options: &DocOptions,
+    styles: &DocStyles,
     issues: &mut Vec<Issue>,
 ) -> TableCell {
     let style_id = if header {
@@ -731,7 +724,7 @@ fn content_table_cell(
     built
 }
 
-fn empty_table_cell(header: bool, span: u32, merge: VMerge, styles: &Gb9704Styles) -> TableCell {
+fn empty_table_cell(header: bool, span: u32, merge: VMerge, styles: &DocStyles) -> TableCell {
     let style_id = if header {
         STYLE_TABLE_HEADER
     } else {

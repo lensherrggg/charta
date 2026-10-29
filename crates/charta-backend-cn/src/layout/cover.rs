@@ -5,12 +5,12 @@ use charta_docx_kit::{Docx, Paragraph};
 
 use crate::layout::text::styled_run;
 use crate::layout::{chinese_date, chinese_date_numerals, string_field};
-use crate::styles::{Gb9704Styles, STYLE_COVER_DATE, STYLE_COVER_SPACER, STYLE_COVER_TITLE};
+use crate::styles::{DocStyles, STYLE_COVER_DATE, STYLE_COVER_SPACER, STYLE_COVER_TITLE};
 
 const BLANK_LINES_BEFORE: usize = 5;
 const BLANK_LINES_AFTER: usize = 7;
 
-pub(crate) fn render(docx: &mut Docx, metadata: &Metadata, styles: &Gb9704Styles) {
+pub(crate) fn render(docx: &mut Docx, metadata: &Metadata, styles: &DocStyles) {
     for _ in 0..BLANK_LINES_BEFORE {
         docx.add_paragraph(Paragraph::styled(STYLE_COVER_SPACER));
     }

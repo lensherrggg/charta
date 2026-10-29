@@ -7,10 +7,10 @@ use charta_docx_kit::{Docx, Paragraph};
 use crate::layout::string_field;
 use crate::layout::text::plain_paragraph;
 use crate::styles::{
-    Gb9704Styles, STYLE_COPY_NUMBER, STYLE_DOC_NUMBER, STYLE_MARK, STYLE_ORG_MARK, STYLE_RED_LINE,
+    DocStyles, STYLE_COPY_NUMBER, STYLE_DOC_NUMBER, STYLE_MARK, STYLE_ORG_MARK, STYLE_RED_LINE,
 };
 
-pub(crate) fn render(docx: &mut Docx, metadata: &Metadata, styles: &Gb9704Styles) {
+pub(crate) fn render(docx: &mut Docx, metadata: &Metadata, styles: &DocStyles) {
     if let Some(copy_number) = string_field(metadata, "copy_number") {
         docx.add_paragraph(plain_paragraph(
             copy_number,

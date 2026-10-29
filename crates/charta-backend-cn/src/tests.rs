@@ -1,6 +1,6 @@
 use crate::numbering::list_marker;
-use crate::styles::{Gb9704Styles, StyleSet, STYLE_BODY, STYLE_STRONG, STYLE_TITLE};
-use crate::{CompilationBackend, Gb9704Backend, Gb9704Options, GeneralBackend};
+use crate::styles::{DocStyles, StyleSet, STYLE_BODY, STYLE_STRONG, STYLE_TITLE};
+use crate::{CompilationBackend, DocOptions, Gb9704Backend, GeneralBackend};
 use charta::{
     Alignment, Backend, Block, Determinism, Document, FrontendId, ImageBlock, Inline, IssueDetails,
     IssueKind, ListBlock, ListItem, MetaValue, Metadata, RenderRequest, SourceSpan, StyleIntent,
@@ -596,7 +596,7 @@ fn general_static_numbering_resets_after_each_title() {
     let mut data: serde_json::Value =
         serde_json::from_str(include_str!("../data/general-styles.json")).unwrap();
     data.as_object_mut().unwrap().remove("numbering");
-    let styles = Gb9704Styles::from_json_for(&data.to_string(), StyleSet::General).unwrap();
+    let styles = DocStyles::from_json_for(&data.to_string(), StyleSet::General).unwrap();
     let backend = GeneralBackend::with_styles(styles);
     let document = Document::new(FrontendId::Markdown, general_metadata()).with_blocks(vec![
         Block::heading(1, vec![Inline::text("第一份材料", span())], span()).with_auto_number(true),
@@ -756,7 +756,7 @@ fn compilation_schema_requires_title_and_date() {
 
 #[test]
 fn pandoc_reference_renames_general_styles_to_builtin_ids() {
-    let styles = Gb9704Styles::embedded_general().unwrap();
+    let styles = DocStyles::embedded_general().unwrap();
     let bytes = styles.pandoc_reference_docx().unwrap();
     let styles_xml = part(&bytes, "word/styles.xml");
 
@@ -785,7 +785,7 @@ fn pandoc_reference_renames_general_styles_to_builtin_ids() {
 
 #[test]
 fn pandoc_reference_maps_notice_specific_styles() {
-    let styles = Gb9704Styles::embedded().unwrap();
+    let styles = DocStyles::embedded().unwrap();
     let bytes = styles.pandoc_reference_docx().unwrap();
     let styles_xml = part(&bytes, "word/styles.xml");
     assert!(!styles_xml.contains("w:styleId=\"GbDate\""));
@@ -820,7 +820,7 @@ fn general_ignores_toc_control_key() {
 #[test]
 fn loads_general_style_data_from_an_external_file() {
     let styles =
-        Gb9704Styles::from_external_for("data/general-styles.json", StyleSet::General).unwrap();
+        DocStyles::from_external_for("data/general-styles.json", StyleSet::General).unwrap();
     let backend = GeneralBackend::with_styles(styles);
     assert_eq!(backend.styles().run(STYLE_TITLE).size_pt, 22.0);
     assert_eq!(backend.styles().run(STYLE_BODY).size_pt, 16.0);
@@ -828,8 +828,8 @@ fn loads_general_style_data_from_an_external_file() {
 
 #[test]
 fn style_sets_are_not_interchangeable() {
-    assert!(Gb9704Styles::from_path("data/general-styles.json").is_err());
-    let notice_styles = Gb9704Styles::embedded().unwrap();
+    assert!(DocStyles::from_path("data/general-styles.json").is_err());
+    let notice_styles = DocStyles::embedded().unwrap();
     assert!(GeneralBackend::try_with_styles(notice_styles).is_err());
 }
 
@@ -847,8 +847,8 @@ fn general_backend_loads_a_patch_file() {
     std::fs::remove_file(&path).ok();
 }
 
-fn patch_general_styles(patch: &str) -> charta::Result<Gb9704Styles> {
-    Gb9704Styles::from_json_with_patch(
+fn patch_general_styles(patch: &str) -> charta::Result<DocStyles> {
+    DocStyles::from_json_with_patch(
         include_str!("../data/general-styles.json"),
         patch,
         StyleSet::General,
@@ -1112,11 +1112,11 @@ fn explicitly_unnumbered_headings_skip_native_numbering() {
 
 #[test]
 fn heading_numbering_falls_back_to_static_without_a_definition() {
-    let styles = Gb9704Styles::from_json(&changed_style_json(|data| {
+    let styles = DocStyles::from_json(&changed_style_json(|data| {
         data.as_object_mut().unwrap().remove("numbering");
     }))
     .unwrap();
-    let backend = Gb9704Backend::with_styles(Gb9704Options::default(), styles);
+    let backend = Gb9704Backend::with_styles(DocOptions::default(), styles);
     let document = Document::new(FrontendId::Markdown, metadata()).with_blocks(numbered_headings());
     let output = backend
         .render(RenderRequest {
@@ -1275,8 +1275,7 @@ fn signer_is_reported_as_ignored() {
 #[test]
 fn header_and_record_can_be_disabled() {
     let document = document();
-    let backend =
-        Gb9704Backend::with_options(Gb9704Options::new().without_header().without_record());
+    let backend = Gb9704Backend::with_options(DocOptions::new().without_header().without_record());
     let output = backend
         .render(RenderRequest {
             document: &document,
@@ -1315,7 +1314,7 @@ fn header_and_record_can_be_disabled() {
 fn header_and_record_switches_are_independent() {
     let document = document();
 
-    let without_record = Gb9704Backend::with_options(Gb9704Options::new().without_record());
+    let without_record = Gb9704Backend::with_options(DocOptions::new().without_record());
     let body = part(
         &without_record
             .render(RenderRequest {
@@ -1330,7 +1329,7 @@ fn header_and_record_switches_are_independent() {
     assert!(!body.contains("抄送："));
     assert!(!body.contains("<w:type w:val=\"nextPage\"/>"));
 
-    let without_header = Gb9704Backend::with_options(Gb9704Options::new().without_header());
+    let without_header = Gb9704Backend::with_options(DocOptions::new().without_header());
     let body = part(
         &without_header
             .render(RenderRequest {
@@ -1355,7 +1354,7 @@ fn optional_header_relaxes_doc_number() {
     assert!(default.schema().field("doc_number").unwrap().required);
     assert!(!default.schema().validate(&metadata).is_empty());
 
-    let backend = Gb9704Backend::with_options(Gb9704Options::new().without_header());
+    let backend = Gb9704Backend::with_options(DocOptions::new().without_header());
     assert!(!backend.schema().field("doc_number").unwrap().required);
     assert!(backend.schema().validate(&metadata).is_empty());
 }
@@ -1363,9 +1362,9 @@ fn optional_header_relaxes_doc_number() {
 #[test]
 fn color_can_be_disabled_explicitly() {
     let document = document();
-    let backend = Gb9704Backend::with_options(Gb9704Options {
+    let backend = Gb9704Backend::with_options(DocOptions {
         adopt_color: false,
-        ..Gb9704Options::default()
+        ..DocOptions::default()
     });
     let output = backend
         .render(RenderRequest {
@@ -1390,7 +1389,7 @@ fn color_can_be_disabled_explicitly() {
 #[test]
 fn all_intents_can_be_adopted() {
     let document = document();
-    let backend = Gb9704Backend::with_options(Gb9704Options::new().adopt_all());
+    let backend = Gb9704Backend::with_options(DocOptions::new().adopt_all());
     let output = backend
         .render(RenderRequest {
             document: &document,
@@ -1426,8 +1425,8 @@ fn style_values_come_from_the_data_file() {
             .unwrap();
         title["run"]["east_asia_font"] = serde_json::json!("测试标题字体");
     });
-    let styles = Gb9704Styles::from_json(&json).unwrap();
-    let backend = Gb9704Backend::with_styles(Gb9704Options::default(), styles);
+    let styles = DocStyles::from_json(&json).unwrap();
+    let backend = Gb9704Backend::with_styles(DocOptions::default(), styles);
     let document = document();
     let output = backend
         .render(RenderRequest {
@@ -1444,8 +1443,8 @@ fn style_values_come_from_the_data_file() {
 
 #[test]
 fn loads_style_data_from_an_external_file() {
-    let styles = Gb9704Styles::from_path("data/styles.json").unwrap();
-    let backend = Gb9704Backend::with_styles(Gb9704Options::default(), styles);
+    let styles = DocStyles::from_path("data/styles.json").unwrap();
+    let backend = Gb9704Backend::with_styles(DocOptions::default(), styles);
     assert_eq!(backend.styles().table().width_mm, 156.0);
     assert_eq!(
         backend.styles().version_record().columns_mm,
@@ -1455,7 +1454,7 @@ fn loads_style_data_from_an_external_file() {
 
 #[test]
 fn rejects_invalid_heading_numbering_data() {
-    let missing_level = Gb9704Styles::from_json(&changed_style_json(|data| {
+    let missing_level = DocStyles::from_json(&changed_style_json(|data| {
         data["numbering"]["heading"]["levels"]
             .as_array_mut()
             .unwrap()
@@ -1465,28 +1464,28 @@ fn rejects_invalid_heading_numbering_data() {
     .to_string();
     assert!(missing_level.contains("缺少第 4 级"), "{missing_level}");
 
-    let bad_format = Gb9704Styles::from_json(&changed_style_json(|data| {
+    let bad_format = DocStyles::from_json(&changed_style_json(|data| {
         data["numbering"]["heading"]["levels"][0]["format"] = serde_json::json!("roman");
     }))
     .unwrap_err()
     .to_string();
     assert!(bad_format.contains("编号格式"), "{bad_format}");
 
-    let both_indents = Gb9704Styles::from_json(&changed_style_json(|data| {
+    let both_indents = DocStyles::from_json(&changed_style_json(|data| {
         data["numbering"]["heading"]["levels"][0]["hanging_twips"] = serde_json::json!(0);
     }))
     .unwrap_err()
     .to_string();
     assert!(both_indents.contains("不能同时指定"), "{both_indents}");
 
-    let bad_placeholder = Gb9704Styles::from_json(&changed_style_json(|data| {
+    let bad_placeholder = DocStyles::from_json(&changed_style_json(|data| {
         data["numbering"]["heading"]["levels"][0]["text"] = serde_json::json!("第一章");
     }))
     .unwrap_err()
     .to_string();
     assert!(bad_placeholder.contains("占位符"), "{bad_placeholder}");
 
-    let bad_restart_level = Gb9704Styles::from_json(&changed_style_json(|data| {
+    let bad_restart_level = DocStyles::from_json(&changed_style_json(|data| {
         data["numbering"]["heading"]["restart"]["never_from"] = serde_json::json!(5);
     }))
     .unwrap_err()
@@ -1496,7 +1495,7 @@ fn rejects_invalid_heading_numbering_data() {
         "{bad_restart_level}"
     );
 
-    let conflicting_restart = Gb9704Styles::from_json(&changed_style_json(|data| {
+    let conflicting_restart = DocStyles::from_json(&changed_style_json(|data| {
         data["numbering"]["heading"]["restart"]["enabled"] = serde_json::json!(false);
         data["numbering"]["heading"]["restart"]["never_from"] = serde_json::json!(3);
     }))
@@ -1510,11 +1509,11 @@ fn rejects_invalid_heading_numbering_data() {
 
 #[test]
 fn heading_numbering_can_disable_restarts() {
-    let styles = Gb9704Styles::from_json(&changed_style_json(|data| {
+    let styles = DocStyles::from_json(&changed_style_json(|data| {
         data["numbering"]["heading"]["restart"]["enabled"] = serde_json::json!(false);
     }))
     .unwrap();
-    let backend = Gb9704Backend::with_styles(Gb9704Options::default(), styles);
+    let backend = Gb9704Backend::with_styles(DocOptions::default(), styles);
     let document = Document::new(FrontendId::Markdown, metadata()).with_blocks(numbered_headings());
     let output = backend
         .render(RenderRequest {
@@ -1528,11 +1527,11 @@ fn heading_numbering_can_disable_restarts() {
 
 #[test]
 fn heading_numbering_stops_restarting_from_a_level() {
-    let styles = Gb9704Styles::from_json(&changed_style_json(|data| {
+    let styles = DocStyles::from_json(&changed_style_json(|data| {
         data["numbering"]["heading"]["restart"]["never_from"] = serde_json::json!(3);
     }))
     .unwrap();
-    let backend = Gb9704Backend::with_styles(Gb9704Options::default(), styles);
+    let backend = Gb9704Backend::with_styles(DocOptions::default(), styles);
     let document = Document::new(FrontendId::Markdown, metadata()).with_blocks(numbered_headings());
     let output = backend
         .render(RenderRequest {
@@ -1577,23 +1576,23 @@ fn style_patches_can_change_restart_settings() {
 
 #[test]
 fn rejects_missing_or_invalid_style_data() {
-    assert!(Gb9704Styles::from_json("{}").is_err());
-    assert!(Gb9704Styles::from_json(&changed_style_json(|data| {
+    assert!(DocStyles::from_json("{}").is_err());
+    assert!(DocStyles::from_json(&changed_style_json(|data| {
         data["schema"] = serde_json::json!(2);
     }))
     .is_err());
-    assert!(Gb9704Styles::from_json(&changed_style_json(|data| {
+    assert!(DocStyles::from_json(&changed_style_json(|data| {
         data["colors"].as_object_mut().unwrap().remove("red");
     }))
     .is_err());
-    assert!(Gb9704Styles::from_json(&changed_style_json(|data| {
+    assert!(DocStyles::from_json(&changed_style_json(|data| {
         data["styles"]
             .as_array_mut()
             .unwrap()
             .retain(|style| style["id"] != "GbBody");
     }))
     .is_err());
-    assert!(Gb9704Styles::from_json(&changed_style_json(|data| {
+    assert!(DocStyles::from_json(&changed_style_json(|data| {
         let styles = data["styles"].as_array_mut().unwrap();
         let body = styles
             .iter_mut()
@@ -1602,11 +1601,11 @@ fn rejects_missing_or_invalid_style_data() {
         body.as_object_mut().unwrap().remove("run");
     }))
     .is_err());
-    assert!(Gb9704Styles::from_json(&changed_style_json(|data| {
+    assert!(DocStyles::from_json(&changed_style_json(|data| {
         data["page"]["margin_top"] = serde_json::json!(37.0);
     }))
     .is_err());
-    assert!(Gb9704Styles::from_json(&changed_style_json(|data| {
+    assert!(DocStyles::from_json(&changed_style_json(|data| {
         let styles = data["styles"].as_array_mut().unwrap();
         let body = styles
             .iter_mut()
@@ -1615,5 +1614,5 @@ fn rejects_missing_or_invalid_style_data() {
         body["paragraph"]["alignment"] = serde_json::json!("middle");
     }))
     .is_err());
-    assert!(Gb9704Styles::from_path("target/definitely-missing-styles.json").is_err());
+    assert!(DocStyles::from_path("target/definitely-missing-styles.json").is_err());
 }

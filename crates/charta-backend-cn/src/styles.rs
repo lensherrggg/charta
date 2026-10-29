@@ -1,4 +1,5 @@
-//! GB/T 9704 style data: loading, validation and conversion to docx-kit values.
+//! Style data for the official-document templates: loading, validation and
+//! conversion to docx-kit values.
 //!
 //! The JSON file is the backend's style source. Rendering code only selects
 //! styles and applies them; it does not carry font, size, color, margin,
@@ -139,7 +140,7 @@ impl StyleSet {
 }
 
 #[derive(Debug, Clone)]
-pub struct Gb9704Styles {
+pub struct DocStyles {
     defaults: Defaults,
     page: PageConfig,
     styles: HashMap<String, StyleConfig>,
@@ -151,7 +152,7 @@ pub struct Gb9704Styles {
     footer: FooterConfig,
 }
 
-impl Gb9704Styles {
+impl DocStyles {
     /// Parse the notice style data embedded in the binary.
     pub fn embedded() -> charta::Result<Self> {
         Self::embedded_for(StyleSet::Notice)
@@ -316,7 +317,7 @@ impl Gb9704Styles {
     pub(crate) fn run(&self, id: &str) -> &RunConfig {
         self.styles
             .get(id)
-            .unwrap_or_else(|| panic!("样式 `{id}` 未在 GB/T 9704 样式数据中定义"))
+            .unwrap_or_else(|| panic!("样式 `{id}` 未在样式数据中定义"))
             .run
             .as_ref()
             .unwrap_or_else(|| panic!("样式 `{id}` 未定义 run 字符格式"))

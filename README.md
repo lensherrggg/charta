@@ -13,8 +13,8 @@ Charta（拉丁语 *charta*，纸、文书）是一个以**语义 IR** 为核心
 - **唯一契约是 IR。** Markdown / Typst 前端先解析为 IR，后端只消费 IR + 元数据。
 - **后端是视觉权威。** 输入源中的字体、字号、颜色等只记录为样式意图；后端显式启用采纳后才生效，被覆盖的意图逐条进入报告。
 - **不静默降级。** Typst 循环、条件、`import`、`#set`、`#show` 等不可静态确定的内容会降级并报告源文件位置、原因和影响范围。
-- **零外部模板。** 引擎不感知 `.docx` 模板；GB/T 9704 后端使用 `charta-docx-kit` 从零构建 OOXML 包。
-- **样式与流程分离。** GB/T 9704 的字体、字号、颜色、页边距、行距、边框、表格列宽等样式值位于后端样式数据文件；渲染流程只按样式 ID 套用，不在代码里内联样式字面量。
+- **零外部模板。** 引擎不感知 `.docx` 模板；所有后端都使用 `charta-docx-kit` 从零构建 OOXML 包。
+- **样式与流程分离。** 中文公文模板的字体、字号、颜色、页边距、行距、边框、表格列宽等样式值位于后端样式数据文件；渲染流程只按样式 ID 套用，不在代码里内联样式字面量。
 - **可审计。** 每次转换同时产出 JSON 报告和 Markdown 报告，区分阻断性错误与非阻断告警。
 
 ## 工程结构
@@ -26,10 +26,10 @@ charta/
 │   ├── charta-md/               # Markdown 前端
 │   ├── charta-typst/            # Typst 前端（只读 CST 子集）
 │   ├── charta-docx-kit/         # OOXML 机械操作工具箱
-│   ├── charta-backend-gb9704/   # GB/T 9704 通知 + 通用材料后端
+│   ├── charta-backend-cn/       # 中文公文模板后端：通知、通用材料、文件汇编
 │   │   ├── data/styles.json     # 通知样式（字体/字号/页边距/表格等）
-│   │   ├── data/general-styles.json # 通用材料样式
-│   │   └── src/layout/          # 版头/主体/版记/文本/页脚流程
+│   │   ├── data/general-styles.json # 通用材料与文件汇编样式
+│   │   └── src/layout/          # 版头/主体/版记/封面/目录/文本/页脚流程
 │   └── charta-cli/              # CLI 薄壳
 ├── docs/DESIGN.md               # 设计文档
 ├── docs/VERSIONING.md           # 版本管理
@@ -111,7 +111,7 @@ cargo run -p charta-cli -- convert examples/notice.md --backend gb9704 --strict
 
 ### 样式数据（FR-BE-5）
 
-通知样式值位于 `crates/charta-backend-gb9704/data/styles.json`，通用材料样式值位于同目录的 `general-styles.json`，默认编译进二进制。`--styles <PATH>` 支持两种文件：
+通知样式值位于 `crates/charta-backend-cn/data/styles.json`，通用材料样式值位于同目录的 `general-styles.json`，默认编译进二进制。`--styles <PATH>` 支持两种文件：
 
 - **局部补丁**：只写要改的样式或段落/页面字段，其余沿用当前后端的内置值。
 - **完整样式文件**：`styles` 是数组时视为完整数据，整份替换内置值。
@@ -167,17 +167,17 @@ cargo run -p charta-cli -- convert examples/general.md --styles examples/general
 库用户可自行加载完整文件或补丁：
 
 ```rust
-use charta_backend_gb9704::{
-    Gb9704Backend, Gb9704Options, Gb9704Styles, GeneralBackend, StyleSet,
+use charta_backend_cn::{
+    Gb9704Backend, DocOptions, DocStyles, GeneralBackend, StyleSet,
 };
 
 fn build_notice() -> Result<Gb9704Backend, Box<dyn std::error::Error>> {
-    let styles = Gb9704Styles::from_path_for("my-gb9704.json", StyleSet::Notice)?;
-    Ok(Gb9704Backend::with_styles(Gb9704Options::default(), styles))
+    let styles = DocStyles::from_path_for("my-notice.json", StyleSet::Notice)?;
+    Ok(Gb9704Backend::with_styles(DocOptions::default(), styles))
 }
 
 fn build_general() -> Result<GeneralBackend, Box<dyn std::error::Error>> {
-    let styles = Gb9704Styles::from_external_for("tweaks.json", StyleSet::General)?;
+    let styles = DocStyles::from_external_for("tweaks.json", StyleSet::General)?;
     Ok(GeneralBackend::with_styles(styles))
 }
 ```
@@ -529,7 +529,7 @@ severity 为 `blocking` 或 `warning`。默认只有 schema 校验（含 `charta
 
 | 验收标准 | 证据 |
 |---|---|
-| 1. Markdown 通知经通知后端生成可核对的 docx | `examples/notice.md` 实际转换；`cargo test -p charta-backend-gb9704`；Word COM 转 PDF 人工核对 |
+| 1. Markdown 通知经通知后端生成可核对的 docx | `examples/notice.md` 实际转换；`cargo test -p charta-backend-cn`；Word COM 转 PDF 人工核对 |
 | 2. 循环/条件 Typst 稿的降级报告可定位源码 | `examples/degraded.typ` 报告；`charta-typst` 单元测试；CLI 集成测试检查 `file/line` |
 | 3. 至少一类样式意图被采纳并形成报告链路 | 默认采纳颜色（`--adopt-color true`）；`degraded.typ` 中颜色生效、字体/字号进入覆盖清单 |
 | 4. 切换后端时引擎核心零改动 | 核心管线只依赖 `Backend`/`Frontend` trait；`charta` 管线测试使用独立假后端 |

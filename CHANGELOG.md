@@ -6,6 +6,7 @@
 
 ### Changed
 
+- 后端 crate 由 `charta-backend-gb9704` 更名为 `charta-backend-cn`：它同时承载通知、通用材料和文件汇编，不再以单一国标命名；共享类型 `Gb9704Styles` / `Gb9704Options` / `Gb9704Template` 改为 `DocStyles` / `DocOptions` / `DocTemplate`，`Gb9704Backend` 仍专指通知后端。
 - CLI 的 `--report` / `--report-md` 改为可选：只有显式给出路径时才写出 JSON / Markdown 报告，缺省只生成 docx；同时不再在标准输出中打印未生成的报告路径。
 - Typst 元数据入口从 YAML front matter 改为主文件顶部的 `#let charta-meta = (...)` 字典字面量；`#let` 在 Typst 编译时没有输出，源文件可直接由 Typst 编译。旧写法会报告 `unsupported_syntax` 并跳过，提示迁移。
 - CLI 默认后端改为 `general`（通用材料）；需要 GB/T 9704 通知时显式传 `--backend gb9704`，`schema` 命令的默认后端同步改为 `general`。
@@ -26,7 +27,8 @@
 
 ### Added
 
-- 新增 `charta reference` 子命令与 `Gb9704Styles::pandoc_reference_docx()`：把样式数据映射为 pandoc 内置样式 ID（`Title`、`Author`、`Date`、`BodyText`、`Heading1`–`3`、`BlockText`、`TableCaption`、`ImageCaption`、`TOCHeading`）并生成 `reference.docx`；另从正文、署名和三级标题派生 `FirstParagraph`、`Compact`、`Date`、`Heading4`–`9`。无对应角色的样式保留原 ID，`--styles` 补丁先生效再映射。
+- 新增 `skills/charta/SKILL.md`：给 AI 助手的仓库开发技能，涵盖结构、命令、样式与后端约定、渲染核验和交付流程。
+- 新增 `charta reference` 子命令与 `DocStyles::pandoc_reference_docx()`：把样式数据映射为 pandoc 内置样式 ID（`Title`、`Author`、`Date`、`BodyText`、`Heading1`–`3`、`BlockText`、`TableCaption`、`ImageCaption`、`TOCHeading`）并生成 `reference.docx`；另从正文、署名和三级标题派生 `FirstParagraph`、`Compact`、`Date`、`Heading4`–`9`。无对应角色的样式保留原 ID，`--styles` 补丁先生效再映射。
 - 列表嵌套超过四级时产生 `list_nesting_flattened` 渲染告警。
 - 有序列表的 `start` 现在用于起始序号，不再忽略。
 - `charta-docx-kit` 支持 `gridSpan`/`vMerge` 和节垂直对齐；表格合并超限时报告 `table_rowspan_truncated` / `table_cells_overflow`。

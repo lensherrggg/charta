@@ -5,9 +5,9 @@ use charta_docx_kit::{BodyItem, Docx, SectionBreak, Table, TableCell, TableRow};
 
 use crate::layout::text::plain_paragraph;
 use crate::layout::{chinese_date, list_field, string_field};
-use crate::styles::{Gb9704Styles, STYLE_VERSION};
+use crate::styles::{DocStyles, STYLE_VERSION};
 
-pub(crate) fn render(docx: &mut Docx, metadata: &Metadata, styles: &Gb9704Styles) {
+pub(crate) fn render(docx: &mut Docx, metadata: &Metadata, styles: &DocStyles) {
     docx.push(BodyItem::SectionBreak(SectionBreak {
         page: docx.page,
         continuous: false,

@@ -1,4 +1,4 @@
-//! GB/T 9704 layout flow.
+//! Layout flow shared by the official-document templates.
 //!
 //! `header` builds 版头, `body` builds 主体, `record` builds 版记. `text`
 //! owns run construction and style-intent adoption; `footer` owns page

@@ -1,9 +1,8 @@
 //! Thin CLI shell. All document logic lives in the library crates.
 
 use charta::{convert, Backend, ConversionRequest, Frontend, SourceFile};
-use charta_backend_gb9704::{
-    CompilationBackend, Gb9704Backend, Gb9704Options, Gb9704Styles, Gb9704Template, GeneralBackend,
-    StyleSet,
+use charta_backend_cn::{
+    CompilationBackend, DocOptions, DocStyles, DocTemplate, Gb9704Backend, GeneralBackend, StyleSet,
 };
 use charta_md::MarkdownFrontend;
 use charta_typst::TypstFrontend;
@@ -197,8 +196,8 @@ fn convert_command(args: ConvertArgs) -> CliResult<i32> {
     };
     let backend = resolve_backend_with_options(
         &args.backend,
-        Gb9704Options {
-            template: Gb9704Template::Notice,
+        DocOptions {
+            template: DocTemplate::Notice,
             header: !args.no_header,
             record: !args.no_record,
             adopt_color: args.adopt_color,
@@ -344,12 +343,12 @@ fn resolve_frontend(path: &Path, choice: FrontendChoice) -> CliResult<FrontendCh
 }
 
 fn resolve_backend(id: &str) -> CliResult<Box<dyn Backend>> {
-    resolve_backend_with_options(id, Gb9704Options::default(), None)
+    resolve_backend_with_options(id, DocOptions::default(), None)
 }
 
 fn resolve_backend_with_options(
     id: &str,
-    options: Gb9704Options,
+    options: DocOptions,
     style_path: Option<&Path>,
 ) -> CliResult<Box<dyn Backend>> {
     match id {
@@ -372,9 +371,9 @@ fn resolve_backend_with_options(
     }
 }
 
-fn load_styles(path: Option<&Path>, set: StyleSet) -> CliResult<Gb9704Styles> {
+fn load_styles(path: Option<&Path>, set: StyleSet) -> CliResult<DocStyles> {
     match path {
-        Some(path) => Ok(Gb9704Styles::from_external_for(path, set)?),
-        None => Ok(Gb9704Styles::embedded_for(set)?),
+        Some(path) => Ok(DocStyles::from_external_for(path, set)?),
+        None => Ok(DocStyles::embedded_for(set)?),
     }
 }

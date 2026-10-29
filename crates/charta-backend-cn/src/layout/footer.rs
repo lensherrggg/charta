@@ -2,9 +2,9 @@
 
 use charta_docx_kit::{Footer, Footers, Indent, Paragraph, Run, RunProperties};
 
-use crate::styles::{Gb9704Styles, RunConfig, STYLE_PAGE_NUMBER};
+use crate::styles::{DocStyles, RunConfig, STYLE_PAGE_NUMBER};
 
-pub(crate) fn build(styles: &Gb9704Styles) -> Footers {
+pub(crate) fn build(styles: &DocStyles) -> Footers {
     let config = styles.footer();
     let page_number = styles.run(STYLE_PAGE_NUMBER);
     let props = footer_run_properties(&config.ascii_font, page_number);

@@ -1,4 +1,4 @@
-//! Report entries owned by the GB/T 9704 backend.
+//! Report entries owned by the backend crate.
 //!
 //! Layout code decides what happened; this module owns the user-facing
 //! messages, codes and severities.
@@ -36,7 +36,7 @@ pub(crate) fn list_nesting_flattened(source: &SourceSpan) -> Issue {
     Issue::render_warning(
         "列表嵌套超过四级，第五级起按正文段落渲染",
         "list_nesting_flattened",
-        Some("GB/T 9704 后端只生成（1）、①、A.、a. 四级列表序数".to_owned()),
+        Some("列表只生成（1）、①、A.、a. 四级序号".to_owned()),
         Some(source.clone()),
     )
 }
@@ -115,7 +115,7 @@ pub(crate) fn heading_numbering_flattened(source: &SourceSpan) -> Issue {
     Issue::render_warning(
         "标题层级超过四级，未生成序号",
         "heading_numbering_flattened",
-        Some("GB/T 9704 层次序数只定义四级".to_owned()),
+        Some("层次序数只定义四级".to_owned()),
         Some(source.clone()),
     )
 }
@@ -136,5 +136,5 @@ pub(crate) fn style_override(
 }
 
 pub(crate) fn disabled_intent_reason() -> &'static str {
-    "GB/T 9704 后端未启用该属性的采纳"
+    "当前后端未启用该属性的采纳"
 }

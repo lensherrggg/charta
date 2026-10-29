@@ -89,7 +89,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "charta-backend-gb9704"
+name = "charta-backend-cn"
 version = "0.1.0"
 dependencies = [
  "charta",
@@ -104,7 +104,7 @@ name = "charta-cli"
 version = "0.1.0"
 dependencies = [
  "charta",
- "charta-backend-gb9704",
+ "charta-backend-cn",
  "charta-md",
  "charta-typst",
  "clap",

@@ -1,4 +1,4 @@
-//! Metadata schema for the GB/T 9704 notice backend.
+//! Metadata schemas for the official-document backends.
 //!
 //! The engine executes validation; this module only declares the fields.
 

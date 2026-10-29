@@ -1,13 +1,16 @@
-//! GB/T 9704-2012 notice backend.
+//! Chinese official-document backends.
 //!
-//! The crate is split by responsibility:
+//! The crate hosts the GB/T 9704 notice, general materials and file
+//! compilation templates, which share layout, styles and numbering. It is
+//! split by responsibility:
 //!
-//! - `schema`: metadata contract
-//! - `styles` + `data/styles.json`: style values
-//! - `layout`: 版头/主体/版记 flow, run construction and page furniture
-//! - `numbering`: list ordinals and future heading numbering
+//! - `schema`: metadata contracts
+//! - `styles` + `data/styles.json` / `data/general-styles.json`: style values
+//! - `layout`: 版头/主体/版记/cover/TOC flow, run construction and page furniture
+//! - `numbering`: list ordinals and heading numbering
+//! - `pandoc`: pandoc `reference.docx` generation from the style data
 //! - `report`: backend-owned report messages and codes
-//! - `lib`: the `Backend` implementation and render orchestration
+//! - `lib`: the `Backend` implementations and render orchestration
 //!
 //! No external `.docx` template is required or referenced.
 
@@ -23,27 +26,27 @@ mod report;
 mod schema;
 mod styles;
 
-pub use styles::{Gb9704Styles, StyleSet};
+pub use styles::{DocStyles, StyleSet};
 
 use schema::{build_compilation_schema, build_general_schema, build_schema};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Gb9704Template {
+pub enum DocTemplate {
     Notice,
     General,
     Compilation,
 }
 
 #[derive(Debug, Clone)]
-pub struct Gb9704Options {
-    pub template: Gb9704Template,
+pub struct DocOptions {
+    pub template: DocTemplate,
     /// Render 版头: copy number, security marks, organization mark, document
     /// number and the red separator.
     pub header: bool,
     /// Render 版记: the copy/issuing record and its dedicated last section.
     pub record: bool,
-    /// Explicitly adopt the source color intent. GB/T 9704 is still the visual
-    /// authority for every other property.
+    /// Explicitly adopt the source color intent. The active template is still
+    /// the visual authority for every other property.
     pub adopt_color: bool,
     pub adopt_font_family: bool,
     pub adopt_font_size: bool,
@@ -51,10 +54,10 @@ pub struct Gb9704Options {
     pub adopt_italic: bool,
 }
 
-impl Default for Gb9704Options {
+impl Default for DocOptions {
     fn default() -> Self {
         Self {
-            template: Gb9704Template::Notice,
+            template: DocTemplate::Notice,
             header: true,
             record: true,
             adopt_color: true,
@@ -66,14 +69,14 @@ impl Default for Gb9704Options {
     }
 }
 
-impl Gb9704Options {
+impl DocOptions {
     pub fn new() -> Self {
         Self::default()
     }
 
     pub(crate) fn general() -> Self {
         Self {
-            template: Gb9704Template::General,
+            template: DocTemplate::General,
             header: false,
             record: false,
             ..Self::default()
@@ -82,7 +85,7 @@ impl Gb9704Options {
 
     pub(crate) fn compilation() -> Self {
         Self {
-            template: Gb9704Template::Compilation,
+            template: DocTemplate::Compilation,
             header: false,
             record: false,
             ..Self::default()
@@ -111,8 +114,8 @@ impl Gb9704Options {
 #[derive(Debug, Clone)]
 pub struct Gb9704Backend {
     schema: MetadataSchema,
-    options: Gb9704Options,
-    styles: Gb9704Styles,
+    options: DocOptions,
+    styles: DocStyles,
 }
 
 impl Default for Gb9704Backend {
@@ -133,7 +136,7 @@ impl Gb9704Backend {
     }
 
     pub fn try_new() -> charta::Result<Self> {
-        Self::try_with_options(Gb9704Options::default())
+        Self::try_with_options(DocOptions::default())
     }
 
     /// Uses the style data embedded in the binary.
@@ -142,20 +145,20 @@ impl Gb9704Backend {
     ///
     /// Panics if the embedded style data is invalid. Use
     /// [`Self::try_with_options`] to handle the error instead.
-    pub fn with_options(options: Gb9704Options) -> Self {
+    pub fn with_options(options: DocOptions) -> Self {
         Self::try_with_options(options).expect("内置 GB/T 9704 样式数据必须有效")
     }
 
-    pub fn try_with_options(options: Gb9704Options) -> charta::Result<Self> {
+    pub fn try_with_options(options: DocOptions) -> charta::Result<Self> {
         Ok(Self {
             schema: build_schema(options.header),
             options,
-            styles: Gb9704Styles::embedded()?,
+            styles: DocStyles::embedded()?,
         })
     }
 
     /// Builds a backend from style data loaded by the caller.
-    pub fn with_styles(options: Gb9704Options, styles: Gb9704Styles) -> Self {
+    pub fn with_styles(options: DocOptions, styles: DocStyles) -> Self {
         Self {
             schema: build_schema(options.header),
             options,
@@ -166,21 +169,21 @@ impl Gb9704Backend {
     /// Loads style data from an external JSON file. The file may be complete
     /// style data or a patch merged over the embedded data.
     pub fn with_style_file(
-        options: Gb9704Options,
+        options: DocOptions,
         path: impl AsRef<std::path::Path>,
     ) -> charta::Result<Self> {
         Ok(Self {
             schema: build_schema(options.header),
             options,
-            styles: Gb9704Styles::from_external_for(path, StyleSet::Notice)?,
+            styles: DocStyles::from_external_for(path, StyleSet::Notice)?,
         })
     }
 
-    pub fn options(&self) -> &Gb9704Options {
+    pub fn options(&self) -> &DocOptions {
         &self.options
     }
 
-    pub fn styles(&self) -> &Gb9704Styles {
+    pub fn styles(&self) -> &DocStyles {
         &self.styles
     }
 }
@@ -246,7 +249,7 @@ impl Backend for Gb9704Backend {
 #[derive(Debug, Clone)]
 pub struct GeneralBackend {
     schema: MetadataSchema,
-    styles: Gb9704Styles,
+    styles: DocStyles,
 }
 
 impl Default for GeneralBackend {
@@ -264,12 +267,12 @@ impl GeneralBackend {
     }
 
     pub fn try_new() -> charta::Result<Self> {
-        Self::try_with_styles(Gb9704Styles::embedded_general()?)
+        Self::try_with_styles(DocStyles::embedded_general()?)
     }
 
     /// Builds a backend from style data loaded by the caller. The data must
     /// satisfy the general-material required style set.
-    pub fn try_with_styles(styles: Gb9704Styles) -> charta::Result<Self> {
+    pub fn try_with_styles(styles: DocStyles) -> charta::Result<Self> {
         styles.validate(StyleSet::General)?;
         Ok(Self {
             schema: build_general_schema(),
@@ -281,17 +284,17 @@ impl GeneralBackend {
     ///
     /// Panics if `styles` does not satisfy the general-material required style
     /// set. Use [`Self::try_with_styles`] to handle the error instead.
-    pub fn with_styles(styles: Gb9704Styles) -> Self {
+    pub fn with_styles(styles: DocStyles) -> Self {
         Self::try_with_styles(styles).expect("通用材料样式数据必须包含完整样式集")
     }
 
     /// Loads general-material style data from an external JSON file. The file
     /// may be complete style data or a patch merged over the embedded data.
     pub fn with_style_file(path: impl AsRef<std::path::Path>) -> charta::Result<Self> {
-        Self::try_with_styles(Gb9704Styles::from_external_for(path, StyleSet::General)?)
+        Self::try_with_styles(DocStyles::from_external_for(path, StyleSet::General)?)
     }
 
-    pub fn styles(&self) -> &Gb9704Styles {
+    pub fn styles(&self) -> &DocStyles {
         &self.styles
     }
 }
@@ -312,7 +315,7 @@ impl Backend for GeneralBackend {
     fn render(&self, request: RenderRequest<'_>) -> Result<RenderOutput> {
         let metadata = request.metadata;
         let mut issues = Vec::new();
-        let options = Gb9704Options::general();
+        let options = DocOptions::general();
         let mut docx = Docx::new();
         docx.page = self.styles.page().setup();
         docx.styles = self.styles.stylesheet();
@@ -360,7 +363,7 @@ impl Backend for GeneralBackend {
 #[derive(Debug, Clone)]
 pub struct CompilationBackend {
     schema: MetadataSchema,
-    styles: Gb9704Styles,
+    styles: DocStyles,
 }
 
 impl Default for CompilationBackend {
@@ -378,10 +381,10 @@ impl CompilationBackend {
     }
 
     pub fn try_new() -> charta::Result<Self> {
-        Self::try_with_styles(Gb9704Styles::embedded_general()?)
+        Self::try_with_styles(DocStyles::embedded_general()?)
     }
 
-    pub fn try_with_styles(styles: Gb9704Styles) -> charta::Result<Self> {
+    pub fn try_with_styles(styles: DocStyles) -> charta::Result<Self> {
         styles.validate(StyleSet::General)?;
         Ok(Self {
             schema: build_compilation_schema(),
@@ -389,15 +392,15 @@ impl CompilationBackend {
         })
     }
 
-    pub fn with_styles(styles: Gb9704Styles) -> Self {
+    pub fn with_styles(styles: DocStyles) -> Self {
         Self::try_with_styles(styles).expect("文件汇编样式数据必须包含完整样式集")
     }
 
     pub fn with_style_file(path: impl AsRef<std::path::Path>) -> charta::Result<Self> {
-        Self::try_with_styles(Gb9704Styles::from_external_for(path, StyleSet::General)?)
+        Self::try_with_styles(DocStyles::from_external_for(path, StyleSet::General)?)
     }
 
-    pub fn styles(&self) -> &Gb9704Styles {
+    pub fn styles(&self) -> &DocStyles {
         &self.styles
     }
 }
@@ -418,7 +421,7 @@ impl Backend for CompilationBackend {
     fn render(&self, request: RenderRequest<'_>) -> Result<RenderOutput> {
         let metadata = request.metadata;
         let mut issues = Vec::new();
-        let options = Gb9704Options::compilation();
+        let options = DocOptions::compilation();
         let mut docx = Docx::new();
         docx.page = self.styles.page().setup();
         docx.styles = self.styles.stylesheet();
@@ -457,7 +460,7 @@ impl Backend for CompilationBackend {
     }
 }
 
-fn option_ignored_metadata(metadata: &Metadata, options: &Gb9704Options) -> Vec<Issue> {
+fn option_ignored_metadata(metadata: &Metadata, options: &DocOptions) -> Vec<Issue> {
     let mut issues = Vec::new();
     if !options.header {
         for field in ["doc_number", "copy_number", "security_level", "urgency"] {

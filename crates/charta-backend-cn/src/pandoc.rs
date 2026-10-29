@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 use charta_docx_kit::{Docx, Paragraph, Stylesheet};
 
-use crate::styles::Gb9704Styles;
+use crate::styles::DocStyles;
 
 /// Existing styles that map onto a pandoc paragraph role.
 const MAPPED: &[(&str, &str, &str)] = &[
@@ -41,7 +41,7 @@ const DERIVED: &[(&str, &str, &str)] = &[
     ("Heading3", "Heading9", "heading 9"),
 ];
 
-impl Gb9704Styles {
+impl DocStyles {
     /// Build a pandoc `reference.docx` from these styles.
     pub fn pandoc_reference_docx(&self) -> charta::Result<Vec<u8>> {
         let mut docx = Docx::new();

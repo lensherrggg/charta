@@ -1,4 +1,4 @@
-//! Numbering strategy for GB/T 9704.
+//! Numbering strategy for the official-document templates.
 //!
 //! Lists use static text ordinals at four levels; the fifth level falls back
 //! to body paragraphs. Headings opt in through FR-IR-5 and use native Word

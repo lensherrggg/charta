@@ -4,16 +4,14 @@ use charta::{Inline, Issue, StyleIntent, StyleProperty};
 use charta_docx_kit::{Paragraph, Run, RunProperties};
 
 use crate::report;
-use crate::styles::{
-    color_hex, parse_color, Gb9704Styles, RunConfig, STYLE_EMPHASIS, STYLE_STRONG,
-};
-use crate::{Gb9704Options, Gb9704Template};
+use crate::styles::{color_hex, parse_color, DocStyles, RunConfig, STYLE_EMPHASIS, STYLE_STRONG};
+use crate::{DocOptions, DocTemplate};
 
 pub(crate) fn build_runs(
     inlines: &[Inline],
     base: &RunConfig,
-    options: &Gb9704Options,
-    styles: &Gb9704Styles,
+    options: &DocOptions,
+    styles: &DocStyles,
     issues: &mut Vec<Issue>,
 ) -> Vec<Run> {
     let mut runs = Vec::new();
@@ -26,7 +24,7 @@ pub(crate) fn build_runs(
 
         if matches!(
             options.template,
-            Gb9704Template::General | Gb9704Template::Compilation
+            DocTemplate::General | DocTemplate::Compilation
         ) {
             italic = false;
             if inline.strong {
@@ -136,8 +134,8 @@ pub(crate) fn styled_paragraph(
     style_id: &str,
     inlines: &[Inline],
     style: &RunConfig,
-    options: &Gb9704Options,
-    styles: &Gb9704Styles,
+    options: &DocOptions,
+    styles: &DocStyles,
     issues: &mut Vec<Issue>,
 ) -> Paragraph {
     let mut paragraph = Paragraph::styled(style_id);

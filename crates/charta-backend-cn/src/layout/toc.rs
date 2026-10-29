@@ -3,14 +3,14 @@
 use charta_docx_kit::{Docx, Paragraph, Run};
 
 use crate::layout::text::styled_run;
-use crate::styles::{Gb9704Styles, STYLE_TOC1, STYLE_TOC_SPACER, STYLE_TOC_TITLE};
+use crate::styles::{DocStyles, STYLE_TOC1, STYLE_TOC_SPACER, STYLE_TOC_TITLE};
 
 const TOC_TITLE: &str = "目\u{3000}\u{3000}录";
 
 /// Depths beyond this are reserved for later releases.
 const DEPTH: u8 = 1;
 
-pub(crate) fn render(docx: &mut Docx, styles: &Gb9704Styles) {
+pub(crate) fn render(docx: &mut Docx, styles: &DocStyles) {
     let mut title = Paragraph::styled(STYLE_TOC_TITLE);
     title.formatting.page_break_before = true;
     title

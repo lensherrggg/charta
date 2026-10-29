@@ -486,8 +486,8 @@ fn external_style_files_and_patches_are_wired() {
     assert_ok(&output);
     assert!(docx.exists());
 
-    let complete = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../charta-backend-gb9704/data/general-styles.json");
+    let complete =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../charta-backend-cn/data/general-styles.json");
     let output = charta()
         .args([
             "convert",
