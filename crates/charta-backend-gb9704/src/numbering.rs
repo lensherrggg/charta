@@ -73,7 +73,7 @@ impl HeadingNumbers {
     }
 }
 
-fn chinese_number(number: u32) -> String {
+pub(crate) fn chinese_number(number: u32) -> String {
     const DIGITS: [&str; 10] = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
     match number {
         0 => "零".to_owned(),

@@ -1,6 +1,6 @@
 use crate::numbering::list_marker;
 use crate::styles::{Gb9704Styles, StyleSet, STYLE_BODY, STYLE_STRONG, STYLE_TITLE};
-use crate::{Gb9704Backend, Gb9704Options, GeneralBackend};
+use crate::{CompilationBackend, Gb9704Backend, Gb9704Options, GeneralBackend};
 use charta::{
     Alignment, Backend, Block, Determinism, Document, FrontendId, ImageBlock, Inline, IssueDetails,
     IssueKind, ListBlock, ListItem, MetaValue, Metadata, RenderRequest, SourceSpan, StyleIntent,
@@ -441,12 +441,48 @@ fn general_recipient_is_optional() {
 }
 
 #[test]
-fn general_schema_requires_author_and_date() {
+fn general_schema_author_and_date_are_optional() {
     let mut metadata = general_metadata();
     metadata.fields.remove("author");
     metadata.fields.remove("date");
     let issues = GeneralBackend::new().schema().validate(&metadata);
-    assert_eq!(issues.len(), 2);
+    assert!(issues.is_empty());
+}
+
+#[test]
+fn general_omits_byline_without_author_and_date() {
+    let document =
+        Document::new(FrontendId::Markdown, Metadata::new()).with_blocks(vec![Block::heading(
+            1,
+            vec![Inline::text("无署名材料", span())],
+            span(),
+        )]);
+    let output = GeneralBackend::new()
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let body = part(&output.docx, "word/document.xml");
+    assert!(!body.contains("<w:pStyle w:val=\"GbByline\"/>"));
+    assert!(!body_text(&body).contains("（）"));
+}
+
+#[test]
+fn general_byline_keeps_the_supplied_half() {
+    let mut metadata = general_metadata();
+    metadata.fields.remove("date");
+    let document = Document::new(FrontendId::Markdown, metadata);
+    let output = GeneralBackend::new()
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let text = body_text(&part(&output.docx, "word/document.xml"));
+    assert!(text.contains("张　三"));
+    assert!(!text.contains("（）"));
+    assert!(!text.contains("2026年10月25日"));
 }
 
 #[test]
@@ -578,6 +614,207 @@ fn general_static_numbering_resets_after_each_title() {
     assert!(text.contains("一、总体要求"));
     assert!(text.contains("一、具体要求"));
     assert_eq!(text.matches("一、").count(), 2);
+}
+
+fn compilation_metadata() -> Metadata {
+    let mut metadata = Metadata::new();
+    metadata.insert("title", "2026 年度重点工作文件汇编");
+    metadata.insert("date", "2026-10-25");
+    metadata
+}
+
+#[test]
+fn compilation_renders_cover_toc_and_numbered_chapters() {
+    let document = Document::new(FrontendId::Markdown, compilation_metadata()).with_blocks(vec![
+        Block::heading(1, vec![Inline::text("第一篇", span())], span()),
+        Block::heading(2, vec![Inline::text("总体要求", span())], span()),
+        Block::heading(3, vec![Inline::text("加强统筹", span())], span()),
+        Block::heading(1, vec![Inline::text("第二篇", span())], span()),
+        Block::heading(2, vec![Inline::text("具体要求", span())], span()),
+    ]);
+    let output = CompilationBackend::new()
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let body = part(&output.docx, "word/document.xml");
+    let styles = part(&output.docx, "word/styles.xml");
+    let settings = part(&output.docx, "word/settings.xml");
+    let text = body_text(&body);
+
+    assert!(text.contains("2026 年度重点工作文件汇编"));
+    assert!(text.contains("2026年10月25日"));
+    assert_eq!(
+        body.matches("<w:pStyle w:val=\"CoverSpacer\"/>").count(),
+        12
+    );
+    let title_at = body.find("CoverTitle").unwrap();
+    let date_at = body.find("CoverDate").unwrap();
+    assert_eq!(body[..title_at].matches("CoverSpacer").count(), 5);
+    assert_eq!(body[title_at..date_at].matches("CoverSpacer").count(), 7);
+    let cover_title = style_block(&styles, "CoverTitle");
+    assert!(cover_title.contains("方正小标宋_GBK"));
+    assert!(cover_title.contains("<w:sz w:val=\"44\"/>"));
+    assert!(cover_title.contains("w:line=\"360\""));
+    let cover_date = style_block(&styles, "CoverDate");
+    assert!(cover_date.contains("方正楷体_GBK"));
+    assert!(cover_date.contains("<w:sz w:val=\"44\"/>"));
+    assert!(cover_date.contains("w:line=\"360\""));
+    let cover_spacer = style_block(&styles, "CoverSpacer");
+    assert!(cover_spacer.contains("w:line=\"360\""));
+
+    assert_eq!(body.matches("<w:sectPr>").count(), 2);
+    let sections: Vec<&str> = body
+        .split("<w:sectPr>")
+        .skip(1)
+        .filter_map(|section| section.split("</w:sectPr>").next())
+        .collect();
+    assert!(!sections[0].contains("<w:footerReference"));
+    assert!(sections[1].contains("<w:footerReference"));
+    assert!(sections[1].contains("<w:pgNumType w:start=\"1\"/>"));
+    assert_eq!(body.matches("<w:type w:val=\"nextPage\"/>").count(), 1);
+    assert_eq!(body.matches("<w:br w:type=\"page\"/>").count(), 1);
+
+    let odd_footer = part(&output.docx, "word/footer1.xml");
+    let even_footer = part(&output.docx, "word/footer2.xml");
+    assert!(odd_footer.contains("<w:jc w:val=\"right\"/>"));
+    assert!(even_footer.contains("<w:jc w:val=\"left\"/>"));
+    assert!(settings.contains("<w:evenAndOddHeaders/>"));
+
+    assert!(text.contains("目\u{3000}\u{3000}录"));
+    let toc_title_at = body.find("TocTitle").unwrap();
+    let toc_spacer_at = body.find("TOCSpacer").unwrap();
+    let toc_field_at = body.find("TOC \\o").unwrap();
+    assert!(toc_title_at < toc_spacer_at && toc_spacer_at < toc_field_at);
+    assert!(body.contains("TOC \\o \"1-1\""));
+    assert!(body.contains("<w:fldChar w:fldCharType=\"begin\" w:dirty=\"true\"/>"));
+    assert!(settings.contains("<w:updateFields w:val=\"true\"/>"));
+
+    assert_eq!(body.matches("<w:numPr>").count(), 3);
+    assert!(body.contains("<w:ilvl w:val=\"0\"/><w:numId w:val=\"1000\"/>"));
+    assert!(body.contains("<w:ilvl w:val=\"1\"/><w:numId w:val=\"1000\"/>"));
+    assert!(body.contains("<w:ilvl w:val=\"0\"/><w:numId w:val=\"1001\"/>"));
+    assert_eq!(body.matches("<w:outlineLvl w:val=\"0\"/>").count(), 2);
+    assert_eq!(body.matches("<w:outlineLvl w:val=\"1\"/>").count(), 2);
+    assert!(!text.contains("各部门："));
+}
+
+#[test]
+fn compilation_single_chapter_numbers_pages_from_one() {
+    let document = Document::new(FrontendId::Markdown, compilation_metadata()).with_blocks(vec![
+        Block::heading(1, vec![Inline::text("唯一篇章", span())], span()),
+        Block::heading(2, vec![Inline::text("总体要求", span())], span()),
+    ]);
+    let output = CompilationBackend::new()
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let body = part(&output.docx, "word/document.xml");
+    let sections: Vec<&str> = body
+        .split("<w:sectPr>")
+        .skip(1)
+        .filter_map(|section| section.split("</w:sectPr>").next())
+        .collect();
+    assert_eq!(sections.len(), 2);
+    assert!(!sections[0].contains("<w:footerReference"));
+    assert!(sections[1].contains("<w:footerReference"));
+    assert!(sections[1].contains("<w:pgNumType w:start=\"1\"/>"));
+}
+
+#[test]
+fn compilation_date_can_use_chinese_numerals() {
+    let mut metadata = compilation_metadata();
+    metadata.insert("date_style", "chinese");
+    let document = Document::new(FrontendId::Markdown, metadata);
+    let output = CompilationBackend::new()
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let text = body_text(&part(&output.docx, "word/document.xml"));
+    assert!(text.contains("二〇二六年十月二十五日"));
+    assert!(!text.contains("2026年10月25日"));
+}
+
+#[test]
+fn compilation_schema_requires_title_and_date() {
+    let mut metadata = compilation_metadata();
+    metadata.fields.remove("title");
+    metadata.fields.remove("date");
+    let issues = CompilationBackend::new().schema().validate(&metadata);
+    assert_eq!(issues.len(), 2);
+
+    let mut metadata = compilation_metadata();
+    metadata.insert("date_style", "roman");
+    let issues = CompilationBackend::new().schema().validate(&metadata);
+    assert_eq!(issues.len(), 1);
+}
+
+#[test]
+fn pandoc_reference_renames_general_styles_to_builtin_ids() {
+    let styles = Gb9704Styles::embedded_general().unwrap();
+    let bytes = styles.pandoc_reference_docx().unwrap();
+    let styles_xml = part(&bytes, "word/styles.xml");
+
+    for replaced in ["GbTitle", "GbBody", "GbHeading1", "GbQuote"] {
+        assert!(
+            !styles_xml.contains(&format!("w:styleId=\"{replaced}\"")),
+            "{replaced} should be renamed"
+        );
+    }
+    assert!(style_block(&styles_xml, "BodyText").contains("方正仿宋_GBK"));
+    assert!(style_block(&styles_xml, "BodyText").contains("w:line=\"560\""));
+    assert!(style_block(&styles_xml, "Title").contains("方正小标宋_GBK"));
+    assert!(style_block(&styles_xml, "Heading1").contains("方正黑体_GBK"));
+    assert!(style_block(&styles_xml, "FirstParagraph").contains("方正仿宋_GBK"));
+    assert!(style_block(&styles_xml, "Date").contains("<w:jc w:val=\"center\"/>"));
+    assert!(!style_block(&styles_xml, "Compact").contains("firstLine"));
+    assert!(style_block(&styles_xml, "Heading9").contains("方正仿宋_GBK"));
+    assert!(styles_xml.contains("w:styleId=\"Author\""));
+    assert!(styles_xml.contains("w:styleId=\"TOCHeading\""));
+    assert!(styles_xml.contains("w:styleId=\"GbStrong\""));
+
+    let mapping = styles.pandoc_style_mapping();
+    assert!(mapping.contains(&("GbByline".to_owned(), "Author".to_owned())));
+    assert!(mapping.contains(&("GbBody".to_owned(), "BodyText".to_owned())));
+}
+
+#[test]
+fn pandoc_reference_maps_notice_specific_styles() {
+    let styles = Gb9704Styles::embedded().unwrap();
+    let bytes = styles.pandoc_reference_docx().unwrap();
+    let styles_xml = part(&bytes, "word/styles.xml");
+    assert!(!styles_xml.contains("w:styleId=\"GbDate\""));
+    assert!(style_block(&styles_xml, "Date").contains("<w:jc w:val=\"right\"/>"));
+    let mapping = styles.pandoc_style_mapping();
+    assert!(mapping.contains(&("GbDate".to_owned(), "Date".to_owned())));
+    assert!(!mapping.iter().any(|(source, _)| source == "GbByline"));
+}
+
+#[test]
+fn general_ignores_toc_control_key() {
+    let mut control = std::collections::BTreeMap::new();
+    control.insert("toc".to_owned(), MetaValue::Bool(true));
+    let mut metadata = general_metadata();
+    metadata.insert("_charta", MetaValue::Map(control));
+    let document = Document::new(FrontendId::Markdown, metadata);
+    let output = GeneralBackend::new()
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let body = part(&output.docx, "word/document.xml");
+    assert!(!body.contains("TOC \\o"));
+    assert!(!body_text(&body).contains("目\u{3000}\u{3000}录"));
+    assert!(output
+        .issues
+        .iter()
+        .any(|issue| issue.message.contains("_charta.toc")));
 }
 
 #[test]

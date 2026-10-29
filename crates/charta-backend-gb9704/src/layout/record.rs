@@ -11,6 +11,7 @@ pub(crate) fn render(docx: &mut Docx, metadata: &Metadata, styles: &Gb9704Styles
     docx.push(BodyItem::SectionBreak(SectionBreak {
         page: docx.page,
         continuous: false,
+        footer: true,
     }));
     docx.page.vertical_alignment = styles.page().version_record_vertical_alignment;
 

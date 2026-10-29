@@ -6,9 +6,11 @@
 
 ### Changed
 
+- CLI 的 `--report` / `--report-md` 改为可选：只有显式给出路径时才写出 JSON / Markdown 报告，缺省只生成 docx；同时不再在标准输出中打印未生成的报告路径。
 - Typst 元数据入口从 YAML front matter 改为主文件顶部的 `#let charta-meta = (...)` 字典字面量；`#let` 在 Typst 编译时没有输出，源文件可直接由 Typst 编译。旧写法会报告 `unsupported_syntax` 并跳过，提示迁移。
 - CLI 默认后端改为 `general`（通用材料）；需要 GB/T 9704 通知时显式传 `--backend gb9704`，`schema` 命令的默认后端同步改为 `general`。
 - `general` 通用材料模板改为以正文第一个一级标题作为大标题：不再读取元数据 `title`（仍提供会报告 `metadata_ignored`），`docProps` 的 `dc:title` 同步取该标题。`#` 使用方正小标宋大标题样式，`##`–`####` 依次对应黑体一级、楷体加粗二级、仿宋三级标题，自动编号相应从 `##` 起步。
+- `general` 的 `author`、`date` 改为可选：只填一项时只生成对应署名行，两项都不填时不生成署名区，大标题后直接接主送机关或正文。
 - `general` 中每个 `#` 开启新的标题编号区段：第一个区段复用样式数据的编号定义，之后每个 `#` 分配新的抽象编号/编号实例 ID，使其后 `##` 从 `一、` 重新开始；静态文本回退同样在每个 `#` 处清零计数。单个 `#` 的文档输出不变。
 - GB/T 9704 列表改为四级静态文本序数：第一级 `（1）`、第二级 `①`、第三级 `A.`、第四级 `a.`，第五级起按正文段落渲染；不再生成 Word 项目符号或自动编号。
 - GB/T 9704 标题三级编号 `1.` 与标题文字之间补一个空格（`w:suff=space`），其余级仍不加后缀空格。
@@ -24,6 +26,7 @@
 
 ### Added
 
+- 新增 `charta reference` 子命令与 `Gb9704Styles::pandoc_reference_docx()`：把样式数据映射为 pandoc 内置样式 ID（`Title`、`Author`、`Date`、`BodyText`、`Heading1`–`3`、`BlockText`、`TableCaption`、`ImageCaption`、`TOCHeading`）并生成 `reference.docx`；另从正文、署名和三级标题派生 `FirstParagraph`、`Compact`、`Date`、`Heading4`–`9`。无对应角色的样式保留原 ID，`--styles` 补丁先生效再映射。
 - 列表嵌套超过四级时产生 `list_nesting_flattened` 渲染告警。
 - 有序列表的 `start` 现在用于起始序号，不再忽略。
 - `charta-docx-kit` 支持 `gridSpan`/`vMerge` 和节垂直对齐；表格合并超限时报告 `table_rowspan_truncated` / `table_cells_overflow`。
@@ -45,6 +48,12 @@
 - 样式数据新增 `numbering.heading`：抽象编号/编号实例 ID、多级类型、四级 `numFmt`/`lvlText`/起始值/缩进/后缀，按 FR-BE-5 外置，并支持通过 `--styles` 补丁覆盖。
 - 样式数据新增 `numbering.heading.restart`：`enabled` 控制下级标题编号是否随上级变更重置（默认 `true`），`never_from`（2–4）指定从第几级起不再重置；转换时写入 `w:lvlRestart w:val="0"`，可通过 `--styles` 补丁调整。
 - `charta-docx-kit` 的编号层级新增 `restart`，可输出 `w:lvlRestart`（`0` 表示永不重置）。
+- 新增 `compilation`（文件汇编）后端：封面（空 5 行、标题、空 7 行、日期）+ 目录页 + 通用模板正文。封面标题为方正小标宋_GBK 二号，日期为方正楷体_GBK 二号并支持 `date_style: arabic|chinese`；目录为 Word TOC 域（当前只收 `#` 级），条目用方正楷体_GBK 三号、无缩进、单倍行距、段前段后 6 磅、点线右对齐页码；`#` 为不编号的篇章标题，`##` 起编号并在每个 `#` 重开区段。封面行距 1.5 倍，目录标题中间 2 个全角空格并在标题下空一行三号字；封面和目录单独成节、不显示页码，每个 `#` 篇章用普通分页符另起一页，正文页码从 1 起连续编号，奇数页居右、偶数页居左。
+- 通用模板（`general`）不再生成目录页；目录能力归入 `compilation` 后端。
+- `general` 与 `compilation` 标题写入 `w:outlineLvl`，Word 导航窗格可按标题层级折叠跳转。
+- 样式数据新增 `line_spacing`（`single` / `1.5` / `double`）与段落制表位 `tabs`（左/中/右对齐，`none` / `dot` 前导符）。
+- `charta-docx-kit` 新增通用域（`Run::field_begin` / `instruction` / `field_separate` / `field_end`）、制表位、分页符与 `Docx::update_fields`。
+- `charta-docx-kit` 分节新增页脚开关与 `w:pgNumType w:start`：可按节隐藏页码，或让某一节从 1 重新编号。
 - Typst 前端支持按缩进嵌套的 `-` / `+` 列表，映射为 `ListBlock` / `ListItem.children`，不再拍平为正文。
 - Typst 前端支持整行 `#image("path")` 与 `#figure(image(...), caption: [...])`，生成 `ImageBlock` 与题注；非字面量路径显式报告。
 - Typst 前端支持受限 `#table(...)`：`columns` 整数/元组、字面量单元格、`table.header`、`table.cell` 的 `colspan`/`rowspan`/`align`，以及 `#figure(table(...), caption: [...])`；动态参数与未采纳的版式参数逐项告警。

@@ -2,7 +2,8 @@
 
 use charta::{convert, Backend, ConversionRequest, Frontend, SourceFile};
 use charta_backend_gb9704::{
-    Gb9704Backend, Gb9704Options, Gb9704Styles, Gb9704Template, GeneralBackend, StyleSet,
+    CompilationBackend, Gb9704Backend, Gb9704Options, Gb9704Styles, Gb9704Template, GeneralBackend,
+    StyleSet,
 };
 use charta_md::MarkdownFrontend;
 use charta_typst::TypstFrontend;
@@ -15,7 +16,7 @@ type CliResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 #[command(
     name = "charta",
     version,
-    about = "Charta 语义文书引擎：Markdown/Typst → IR → 规范后端 → docx + 审计报告",
+    about = "Charta 语义文书引擎：Markdown/Typst → IR → 规范后端 → docx（可选审计报告）",
     disable_help_subcommand = true
 )]
 struct Cli {
@@ -26,12 +27,34 @@ struct Cli {
 #[derive(Subcommand)]
 #[allow(clippy::large_enum_variant)]
 enum Command {
-    /// 将单个 Markdown 或 Typst 文档转换为 docx，并输出报告
+    /// 将单个 Markdown 或 Typst 文档转换为 docx，可选输出审计报告
     Convert(ConvertArgs),
+    /// 生成供 pandoc 使用的 reference.docx（样式映射为 pandoc 内置名）
+    Reference(ReferenceArgs),
     /// 列出内置规范后端
     Backends,
     /// 查看后端的元数据 schema
     Schema(SchemaArgs),
+}
+
+#[derive(Args)]
+struct ReferenceArgs {
+    /// 样式来源后端：general（通用材料）、compilation（文件汇编）或 gb9704（通知）
+    #[arg(long, default_value = "general", value_name = "ID")]
+    backend: String,
+
+    /// 输出路径
+    #[arg(
+        long,
+        short,
+        value_name = "PATH",
+        default_value = "pandoc-reference.docx"
+    )]
+    output: PathBuf,
+
+    /// 外部样式 JSON：完整样式文件或只含改动项的补丁
+    #[arg(long, value_name = "PATH")]
+    styles: Option<PathBuf>,
 }
 
 #[derive(Args)]
@@ -44,7 +67,7 @@ struct ConvertArgs {
     #[arg(long, value_enum, default_value_t = FrontendChoice::Auto)]
     frontend: FrontendChoice,
 
-    /// 目标规范后端：general（通用材料）或 gb9704（通知）
+    /// 目标规范后端：general（通用材料）、compilation（文件汇编）或 gb9704（通知）
     #[arg(long, default_value = "general", value_name = "ID")]
     backend: String,
 
@@ -52,11 +75,11 @@ struct ConvertArgs {
     #[arg(long, short, value_name = "PATH")]
     output: Option<PathBuf>,
 
-    /// 机器可读报告路径；缺省为 <output>.report.json
+    /// 机器可读报告路径；提供时才写出 JSON 报告
     #[arg(long, value_name = "PATH")]
     report: Option<PathBuf>,
 
-    /// 人可读报告路径；缺省为 <output>.report.md
+    /// 人可读报告路径；提供时才写出 Markdown 报告
     #[arg(long = "report-md", value_name = "PATH")]
     report_md: Option<PathBuf>,
 
@@ -133,16 +156,18 @@ fn main() {
 fn run(cli: Cli) -> CliResult<i32> {
     match cli.command {
         Command::Convert(args) => convert_command(args),
+        Command::Reference(args) => reference_command(args),
         Command::Backends => {
             println!("charta {}", charta::VERSION);
-            println!("{:<10} {:<28} schema 字段数", "ID", "名称");
+            println!("{:<12} {:<28} schema 字段数", "ID", "名称");
             let backends: Vec<Box<dyn Backend>> = vec![
                 Box::new(Gb9704Backend::try_new()?),
                 Box::new(GeneralBackend::try_new()?),
+                Box::new(CompilationBackend::try_new()?),
             ];
             for backend in &backends {
                 println!(
-                    "{:<10} {:<28} {}",
+                    "{:<12} {:<28} {}",
                     backend.id(),
                     backend.display_name(),
                     backend.schema().fields.len()
@@ -189,14 +214,6 @@ fn convert_command(args: ConvertArgs) -> CliResult<i32> {
         .output
         .clone()
         .unwrap_or_else(|| args.input.with_extension("docx"));
-    let report_path = args
-        .report
-        .clone()
-        .unwrap_or_else(|| output_path.with_extension("report.json"));
-    let report_md_path = args
-        .report_md
-        .clone()
-        .unwrap_or_else(|| output_path.with_extension("report.md"));
 
     let source = SourceFile::read(&args.input)?;
     let result = convert(ConversionRequest {
@@ -209,8 +226,12 @@ fn convert_command(args: ConvertArgs) -> CliResult<i32> {
     if let Some(docx) = &result.docx {
         std::fs::write(&output_path, docx)?;
     }
-    result.report.write_json(&report_path)?;
-    result.report.write_markdown(&report_md_path)?;
+    if let Some(path) = &args.report {
+        result.report.write_json(path)?;
+    }
+    if let Some(path) = &args.report_md {
+        result.report.write_markdown(path)?;
+    }
     if let Some(path) = &args.emit_ir {
         let mut json = serde_json::to_string_pretty(&result.document)?;
         json.push('\n');
@@ -225,8 +246,12 @@ fn convert_command(args: ConvertArgs) -> CliResult<i32> {
         Some(_) => println!("docx：{}", output_path.display()),
         None => println!("docx：未生成（存在阻断性问题）"),
     }
-    println!("报告：{}", report_path.display());
-    println!("报告：{}", report_md_path.display());
+    if let Some(path) = &args.report {
+        println!("报告：{}", path.display());
+    }
+    if let Some(path) = &args.report_md {
+        println!("报告：{}", path.display());
+    }
     if let Some(path) = &args.emit_ir {
         println!("IR：{}", path.display());
     }
@@ -258,7 +283,12 @@ fn convert_command(args: ConvertArgs) -> CliResult<i32> {
             );
         }
         if result.report.blocking_count() > 5 {
-            println!("  …… 其余 {} 项见报告", result.report.blocking_count() - 5);
+            let rest = result.report.blocking_count() - 5;
+            if args.report.is_some() || args.report_md.is_some() {
+                println!("  …… 其余 {rest} 项见报告");
+            } else {
+                println!("  …… 其余 {rest} 项");
+            }
         }
         if args.strict {
             println!("提示：严格模式会把契约外语法升级为阻断。");
@@ -266,6 +296,31 @@ fn convert_command(args: ConvertArgs) -> CliResult<i32> {
     }
 
     Ok(if result.report.has_blocking() { 2 } else { 0 })
+}
+
+fn reference_command(args: ReferenceArgs) -> CliResult<i32> {
+    let set = match args.backend.as_str() {
+        "gb9704" => StyleSet::Notice,
+        "general" | "compilation" => StyleSet::General,
+        other => {
+            return Err(charta::Error::InvalidArgument(format!(
+                "reference 支持 general、compilation、gb9704，未知后端 `{other}`"
+            ))
+            .into())
+        }
+    };
+    let styles = load_styles(args.styles.as_deref(), set)?;
+    let mapping = styles.pandoc_style_mapping();
+    let bytes = styles.pandoc_reference_docx()?;
+    std::fs::write(&args.output, bytes)?;
+
+    println!("charta {}", charta::VERSION);
+    println!("样式集：{}", args.backend);
+    for (source, target) in mapping {
+        println!("  {source} → {target}");
+    }
+    println!("reference.docx：{}", args.output.display());
+    Ok(0)
 }
 
 fn resolve_frontend(path: &Path, choice: FrontendChoice) -> CliResult<FrontendChoice> {
@@ -306,8 +361,12 @@ fn resolve_backend_with_options(
             let styles = load_styles(style_path, StyleSet::General)?;
             Ok(Box::new(GeneralBackend::try_with_styles(styles)?))
         }
+        "compilation" => {
+            let styles = load_styles(style_path, StyleSet::General)?;
+            Ok(Box::new(CompilationBackend::try_with_styles(styles)?))
+        }
         other => Err(charta::Error::InvalidArgument(format!(
-            "未知后端 `{other}`；当前可用：general、gb9704"
+            "未知后端 `{other}`；当前可用：general、compilation、gb9704"
         ))
         .into()),
     }

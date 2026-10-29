@@ -11,6 +11,9 @@ pub struct Docx {
     pub footers: Footers,
     pub core: CoreProperties,
     pub images: Vec<Image>,
+    /// Ask Word to refresh fields (e.g. TOC page numbers) when the document
+    /// opens.
+    pub update_fields: bool,
 }
 
 impl Default for Docx {
@@ -29,6 +32,7 @@ impl Docx {
             footers: Footers::default(),
             core: CoreProperties::default(),
             images: Vec::new(),
+            update_fields: false,
         }
     }
 
@@ -69,6 +73,8 @@ pub struct PageSetup {
     pub header_mm: f32,
     pub footer_mm: f32,
     pub vertical_alignment: Option<PageVerticalAlignment>,
+    /// Restart page numbering at this value in the section.
+    pub page_number_start: Option<u32>,
 }
 
 impl PageSetup {
@@ -83,6 +89,7 @@ impl PageSetup {
             header_mm: 12.7,
             footer_mm: 17.5,
             vertical_alignment: None,
+            page_number_start: None,
         }
     }
 
@@ -134,6 +141,8 @@ impl From<Table> for BodyItem {
 pub struct SectionBreak {
     pub page: PageSetup,
     pub continuous: bool,
+    /// When false the section has no footer, so page numbers stay hidden.
+    pub footer: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -208,6 +217,46 @@ pub struct ParagraphFormatting {
     pub page_break_before: bool,
     /// Zero-based Word outline level (0 = Heading 1).
     pub outline_level: Option<u8>,
+    pub tabs: Vec<TabStop>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TabStop {
+    pub position_twips: i32,
+    pub alignment: TabAlignment,
+    pub leader: TabLeader,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TabAlignment {
+    Left,
+    Center,
+    Right,
+}
+
+impl TabAlignment {
+    pub(crate) fn xml_value(self) -> &'static str {
+        match self {
+            Self::Left => "left",
+            Self::Center => "center",
+            Self::Right => "right",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TabLeader {
+    None,
+    Dot,
+}
+
+impl TabLeader {
+    pub(crate) fn xml_value(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Dot => "dot",
+        }
+    }
 }
 
 impl ParagraphFormatting {
@@ -370,6 +419,39 @@ impl Run {
         }
     }
 
+    pub fn field_begin() -> Self {
+        Self::field_char(FieldCharType::Begin)
+    }
+
+    pub fn field_separate() -> Self {
+        Self::field_char(FieldCharType::Separate)
+    }
+
+    pub fn field_end() -> Self {
+        Self::field_char(FieldCharType::End)
+    }
+
+    fn field_char(kind: FieldCharType) -> Self {
+        Self {
+            content: RunContent::FieldChar(kind),
+            properties: RunProperties::default(),
+        }
+    }
+
+    pub fn instruction(instruction: impl Into<String>) -> Self {
+        Self {
+            content: RunContent::Instruction(instruction.into()),
+            properties: RunProperties::default(),
+        }
+    }
+
+    pub fn page_break() -> Self {
+        Self {
+            content: RunContent::PageBreak,
+            properties: RunProperties::default(),
+        }
+    }
+
     pub fn properties(mut self, properties: RunProperties) -> Self {
         self.properties = properties;
         self
@@ -381,6 +463,16 @@ pub enum RunContent {
     Text(String),
     PageNumber,
     Image(usize),
+    FieldChar(FieldCharType),
+    Instruction(String),
+    PageBreak,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldCharType {
+    Begin,
+    Separate,
+    End,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

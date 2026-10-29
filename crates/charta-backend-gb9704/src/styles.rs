@@ -10,7 +10,8 @@ use std::path::Path;
 use charta_docx_kit::{
     Alignment, Border, Indent, LineSpacing, MultiLevelType, NumberFormat, NumberingDefinition,
     NumberingLevel, NumberingSuffix, PageSetup, PageVerticalAlignment, ParagraphBorders,
-    ParagraphFormatting, RunProperties, Spacing, StyleDefinition, Stylesheet, VerticalAlignment,
+    ParagraphFormatting, RunProperties, Spacing, StyleDefinition, Stylesheet, TabAlignment,
+    TabLeader, TabStop, VerticalAlignment,
 };
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -41,6 +42,12 @@ pub(crate) const STYLE_BYLINE: &str = "GbByline";
 pub(crate) const STYLE_STRONG: &str = "GbStrong";
 pub(crate) const STYLE_EMPHASIS: &str = "GbEmphasis";
 pub(crate) const STYLE_PAGE_NUMBER: &str = "GbPageNumber";
+pub(crate) const STYLE_TOC_TITLE: &str = "TocTitle";
+pub(crate) const STYLE_TOC_SPACER: &str = "TOCSpacer";
+pub(crate) const STYLE_TOC1: &str = "TOC1";
+pub(crate) const STYLE_COVER_SPACER: &str = "CoverSpacer";
+pub(crate) const STYLE_COVER_TITLE: &str = "CoverTitle";
+pub(crate) const STYLE_COVER_DATE: &str = "CoverDate";
 
 const REQUIRED_STYLES: &[&str] = &[
     "Normal",
@@ -87,6 +94,12 @@ const GENERAL_REQUIRED_STYLES: &[&str] = &[
     STYLE_STRONG,
     STYLE_EMPHASIS,
     STYLE_PAGE_NUMBER,
+    STYLE_TOC_TITLE,
+    STYLE_TOC_SPACER,
+    STYLE_TOC1,
+    STYLE_COVER_SPACER,
+    STYLE_COVER_TITLE,
+    STYLE_COVER_DATE,
 ];
 
 const SCHEMA_VERSION: u32 = 1;
@@ -369,6 +382,7 @@ impl PageConfig {
             header_mm: self.header_mm,
             footer_mm: self.footer_mm,
             vertical_alignment: self.vertical_alignment,
+            page_number_start: None,
         }
     }
 }
@@ -386,11 +400,13 @@ struct StyleConfig {
 struct ParagraphConfig {
     alignment: Option<Alignment>,
     line_spacing_pt: Option<f32>,
+    line_spacing: Option<LineSpacing>,
     space_before_pt: Option<f32>,
     space_after_pt: Option<f32>,
     keep_next: bool,
     indent: Indent,
     borders: ParagraphBorders,
+    tabs: Vec<TabStop>,
 }
 
 impl ParagraphConfig {
@@ -400,13 +416,15 @@ impl ParagraphConfig {
             spacing: Spacing {
                 before_pt: self.space_before_pt,
                 after_pt: self.space_after_pt,
-                line: self
-                    .line_spacing_pt
-                    .map(|points| LineSpacing::Exact { points }),
+                line: self.line_spacing.or_else(|| {
+                    self.line_spacing_pt
+                        .map(|points| LineSpacing::Exact { points })
+                }),
             },
             indent: self.indent,
             borders: self.borders,
             keep_next: self.keep_next,
+            tabs: self.tabs.clone(),
             ..ParagraphFormatting::default()
         }
     }
@@ -500,6 +518,51 @@ fn parse_alignment(value: &str, context: &str) -> charta::Result<Alignment> {
         "right" => Ok(Alignment::Right),
         "justify" => Ok(Alignment::Justify),
         other => Err(invalid(format!("{context} 的对齐方式 `{other}` 无效"))),
+    }
+}
+
+fn parse_line_spacing(value: &str, style_id: &str) -> charta::Result<LineSpacing> {
+    match value {
+        "single" => Ok(LineSpacing::Single),
+        "1.5" => Ok(LineSpacing::Multiple(1.5)),
+        "double" => Ok(LineSpacing::Multiple(2.0)),
+        other => Err(invalid(format!(
+            "样式 `{style_id}` 的 line_spacing `{other}` 无效；可用：single、1.5、double"
+        ))),
+    }
+}
+
+impl RawTabStop {
+    fn resolve(self, style_id: &str) -> charta::Result<TabStop> {
+        if !positive(self.position_mm) {
+            return Err(invalid(format!(
+                "样式 `{style_id}` 的制表位 position_mm 必须大于 0"
+            )));
+        }
+        let alignment = match self.alignment.as_str() {
+            "left" => TabAlignment::Left,
+            "center" => TabAlignment::Center,
+            "right" => TabAlignment::Right,
+            other => {
+                return Err(invalid(format!(
+                    "样式 `{style_id}` 的制表位对齐 `{other}` 无效；可用：left、center、right"
+                )))
+            }
+        };
+        let leader = match self.leader.as_str() {
+            "none" => TabLeader::None,
+            "dot" => TabLeader::Dot,
+            other => {
+                return Err(invalid(format!(
+                    "样式 `{style_id}` 的制表位前导符 `{other}` 无效；可用：none、dot"
+                )))
+            }
+        };
+        Ok(TabStop {
+            position_twips: (self.position_mm * 1440.0 / 25.4).round() as i32,
+            alignment,
+            leader,
+        })
     }
 }
 
@@ -1107,15 +1170,36 @@ impl RawStyle {
 struct RawParagraph {
     alignment: Option<String>,
     line_spacing_pt: Option<f32>,
+    line_spacing: Option<String>,
     space_before_pt: Option<f32>,
     space_after_pt: Option<f32>,
     #[serde(default)]
     keep_next: bool,
     indent: Option<RawIndent>,
+    #[serde(default)]
+    tabs: Vec<RawTabStop>,
     top_border: Option<RawBorder>,
     bottom_border: Option<RawBorder>,
     left_border: Option<RawBorder>,
     right_border: Option<RawBorder>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawTabStop {
+    position_mm: f32,
+    #[serde(default = "default_tab_alignment")]
+    alignment: String,
+    #[serde(default = "default_tab_leader")]
+    leader: String,
+}
+
+fn default_tab_alignment() -> String {
+    "right".to_owned()
+}
+
+fn default_tab_leader() -> String {
+    "none".to_owned()
 }
 
 impl RawParagraph {
@@ -1131,6 +1215,16 @@ impl RawParagraph {
                 )));
             }
         }
+        if self.line_spacing.is_some() && self.line_spacing_pt.is_some() {
+            return Err(invalid(format!(
+                "样式 `{style_id}` 不能同时指定 line_spacing 和 line_spacing_pt"
+            )));
+        }
+        let line_spacing = self
+            .line_spacing
+            .as_deref()
+            .map(|value| parse_line_spacing(value, style_id))
+            .transpose()?;
         for (name, value) in [
             ("space_before_pt", self.space_before_pt),
             ("space_after_pt", self.space_after_pt),
@@ -1142,6 +1236,11 @@ impl RawParagraph {
             }
         }
         let indent = self.indent.map(RawIndent::resolve).unwrap_or_default();
+        let tabs = self
+            .tabs
+            .into_iter()
+            .map(|tab| tab.resolve(style_id))
+            .collect::<charta::Result<Vec<_>>>()?;
         Ok(ParagraphConfig {
             alignment: self
                 .alignment
@@ -1149,10 +1248,12 @@ impl RawParagraph {
                 .map(|value| parse_alignment(value, &format!("样式 `{style_id}`")))
                 .transpose()?,
             line_spacing_pt: self.line_spacing_pt,
+            line_spacing,
             space_before_pt: self.space_before_pt,
             space_after_pt: self.space_after_pt,
             keep_next: self.keep_next,
             indent,
+            tabs,
             borders: ParagraphBorders {
                 top: self
                     .top_border

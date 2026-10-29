@@ -24,7 +24,10 @@ pub(crate) fn build_runs(
         let mut italic = inline.emphasis;
         let mut color = base.color;
 
-        if options.template == Gb9704Template::General {
+        if matches!(
+            options.template,
+            Gb9704Template::General | Gb9704Template::Compilation
+        ) {
             italic = false;
             if inline.strong {
                 if let Some(style) = styles.try_run(STYLE_STRONG) {

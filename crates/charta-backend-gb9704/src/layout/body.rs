@@ -7,8 +7,8 @@ use charta::{
     TableBlock, TableCell as IrTableCell,
 };
 use charta_docx_kit::{
-    Alignment as DocxAlignment, Docx, Image, NumberingDefinition, NumberingRef, Paragraph, Run,
-    Table, TableBorders, TableCell, TableRow, VMerge,
+    Alignment as DocxAlignment, BodyItem, Docx, Image, NumberingDefinition, NumberingRef,
+    PageSetup, Paragraph, Run, SectionBreak, Table, TableBorders, TableCell, TableRow, VMerge,
 };
 
 use crate::layout::text::{build_runs, plain_paragraph, styled_paragraph, styled_run};
@@ -156,19 +156,70 @@ pub(crate) fn render_general(
     }
 }
 
+pub(crate) fn render_compilation_content(
+    docx: &mut Docx,
+    blocks: &[Block],
+    options: &Gb9704Options,
+    styles: &Gb9704Styles,
+    issues: &mut Vec<Issue>,
+) {
+    // The cover and the TOC form their own section without a footer, so their
+    // pages carry no page numbers; the body starts at page 1.
+    docx.body.push(BodyItem::SectionBreak(section_break(
+        docx.page, None, false,
+    )));
+    docx.page.page_number_start = Some(1);
+
+    let mut numbers = NumberingState::default();
+    let mut started = false;
+    for block in blocks {
+        // Chapters are separated by a plain page break; the body stays in one
+        // section so page numbers run continuously.
+        if started && matches!(&block.kind, BlockKind::Heading { level: 1, .. }) {
+            docx.body.push(BodyItem::PageBreak);
+        }
+        render_blocks(
+            std::slice::from_ref(block),
+            docx,
+            options,
+            styles,
+            issues,
+            &mut numbers,
+            false,
+            Gb9704Template::Compilation,
+        );
+        started = true;
+    }
+}
+
+fn section_break(page: PageSetup, page_number_start: Option<u32>, footer: bool) -> SectionBreak {
+    SectionBreak {
+        page: PageSetup {
+            page_number_start,
+            ..page
+        },
+        continuous: false,
+        footer,
+    }
+}
+
 fn add_general_preface(docx: &mut Docx, metadata: &Metadata, styles: &Gb9704Styles) {
     let author = string_field(metadata, "author").unwrap_or_default();
-    let date = string_field(metadata, "date").unwrap_or_default();
-    let byline = if author.trim().is_empty() {
-        format!("（{}）", chinese_date(date))
-    } else {
-        format!("{}\n（{}）", spaced_name(author), chinese_date(date))
+    let date = chinese_date(string_field(metadata, "date").unwrap_or_default());
+    let author = author.trim();
+    let byline = match (author.is_empty(), date.trim().is_empty()) {
+        (false, false) => Some(format!("{}\n（{date}）", spaced_name(author))),
+        (false, true) => Some(spaced_name(author)),
+        (true, false) => Some(format!("（{date}）")),
+        (true, true) => None,
     };
-    docx.add_paragraph(plain_paragraph(
-        &byline,
-        STYLE_BYLINE,
-        styles.run(STYLE_BYLINE),
-    ));
+    if let Some(byline) = byline {
+        docx.add_paragraph(plain_paragraph(
+            &byline,
+            STYLE_BYLINE,
+            styles.run(STYLE_BYLINE),
+        ));
+    }
 
     if let Some(recipient) =
         string_field(metadata, "recipient").filter(|value| !value.trim().is_empty())
@@ -229,13 +280,29 @@ fn render_blocks(
                 } else {
                     heading_style(*level, styles, template)
                 };
-                if matches!(template, Gb9704Template::General) && *level == 1 {
+                if matches!(
+                    template,
+                    Gb9704Template::General | Gb9704Template::Compilation
+                ) && *level == 1
+                {
                     numbers.heading_num_id = None;
                     numbers.headings.reset();
                 }
                 let mut paragraph =
                     styled_paragraph(style_id, content, style, options, styles, issues);
-                if matches!(auto_number, Some(true)) {
+                if !quote
+                    && matches!(
+                        template,
+                        Gb9704Template::General | Gb9704Template::Compilation
+                    )
+                {
+                    paragraph.formatting.outline_level = Some(level.saturating_sub(1).min(8));
+                }
+                let numbering_requested = match auto_number {
+                    Some(value) => *value,
+                    None => matches!(template, Gb9704Template::Compilation),
+                };
+                if numbering_requested {
                     apply_heading_numbering(
                         *level,
                         template,
@@ -300,7 +367,7 @@ fn apply_heading_numbering(
 ) {
     let offset = match template {
         Gb9704Template::Notice => 0,
-        Gb9704Template::General => 1,
+        Gb9704Template::General | Gb9704Template::Compilation => 1,
     };
     if level <= offset {
         return;
@@ -394,10 +461,10 @@ fn heading_style(
     template: Gb9704Template,
 ) -> (&'static str, &RunConfig) {
     let style_id = match (template, level) {
-        (Gb9704Template::General, 1) => STYLE_TITLE,
-        (Gb9704Template::General, 2) => STYLE_HEADING1,
-        (Gb9704Template::General, 3) => STYLE_HEADING2,
-        (Gb9704Template::General, _) => STYLE_HEADING3,
+        (Gb9704Template::General | Gb9704Template::Compilation, 1) => STYLE_TITLE,
+        (Gb9704Template::General | Gb9704Template::Compilation, 2) => STYLE_HEADING1,
+        (Gb9704Template::General | Gb9704Template::Compilation, 3) => STYLE_HEADING2,
+        (Gb9704Template::General | Gb9704Template::Compilation, _) => STYLE_HEADING3,
         (Gb9704Template::Notice, 1) => STYLE_HEADING1,
         (Gb9704Template::Notice, 2) => STYLE_HEADING2,
         (Gb9704Template::Notice, _) => STYLE_HEADING3,

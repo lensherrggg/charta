@@ -328,6 +328,40 @@ fn converts_general_template_with_author_and_date() {
 }
 
 #[test]
+fn converts_compilation_with_cover_and_toc() {
+    let dir = work_dir("compilation");
+    let input = dir.join("compilation.md");
+    let docx = dir.join("compilation.docx");
+    let report_json = dir.join("compilation.report.json");
+    fs::write(
+        &input,
+        "---\ntitle: 2026 年度重点工作文件汇编\ndate: 2026-10-25\n---\n\n# 第一篇\n\n## 总体要求\n\n正文内容。\n",
+    )
+    .unwrap();
+
+    let output = charta()
+        .args([
+            "convert",
+            input.to_str().unwrap(),
+            "--backend",
+            "compilation",
+            "--output",
+            docx.to_str().unwrap(),
+            "--report",
+            report_json.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_ok(&output);
+    assert!(docx.exists());
+    let report = report(&report_json);
+    assert_eq!(report["backend"], "compilation");
+    assert_eq!(report["summary"]["blocking"], 0);
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn version_backends_and_schema_commands_work() {
     let version = charta().arg("--version").output().unwrap();
     assert_ok(&version);
@@ -340,6 +374,8 @@ fn version_backends_and_schema_commands_work() {
     assert!(stdout.contains("GB/T 9704-2012"));
     assert!(stdout.contains("general"));
     assert!(stdout.contains("通用材料"));
+    assert!(stdout.contains("compilation"));
+    assert!(stdout.contains("文件汇编"));
 
     let schema = charta()
         .args(["schema", "--backend", "gb9704"])
@@ -372,12 +408,35 @@ fn version_backends_and_schema_commands_work() {
         .as_array()
         .unwrap()
         .iter()
-        .any(|field| { field["name"] == "author" && field["required"] == true }));
+        .any(|field| { field["name"] == "author" && field["required"] == false }));
     assert!(value["fields"]
         .as_array()
         .unwrap()
         .iter()
         .any(|field| { field["name"] == "recipient" && field["required"] == false }));
+
+    let compilation_schema = charta()
+        .args(["schema", "--backend", "compilation", "--json"])
+        .output()
+        .unwrap();
+    assert_ok(&compilation_schema);
+    let value: Value = serde_json::from_slice(&compilation_schema.stdout).unwrap();
+    assert!(value["fields"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|field| { field["name"] == "title" && field["required"] == true }));
+    let date_style = value["fields"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|field| field["name"] == "date_style")
+        .unwrap();
+    assert!(date_style["enum_values"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|value| value == "chinese"));
 
     let default_schema = charta().args(["schema", "--json"]).output().unwrap();
     assert_ok(&default_schema);
@@ -386,7 +445,7 @@ fn version_backends_and_schema_commands_work() {
         .as_array()
         .unwrap()
         .iter()
-        .any(|field| { field["name"] == "author" && field["required"] == true }));
+        .any(|field| { field["name"] == "author" && field["required"] == false }));
 }
 
 #[test]
@@ -468,6 +527,103 @@ fn external_style_files_and_patches_are_wired() {
         .unwrap();
     assert_eq!(bad.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&bad.stderr).contains("未定义样式"));
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn generates_a_pandoc_reference_docx() {
+    let dir = work_dir("pandoc-reference");
+    let output_path = dir.join("reference.docx");
+    let output = charta()
+        .args([
+            "reference",
+            "--backend",
+            "general",
+            "--output",
+            output_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_ok(&output);
+    let bytes = fs::read(&output_path).unwrap();
+    assert!(bytes.starts_with(b"PK"));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("GbBody → BodyText"));
+    assert!(stdout.contains("reference.docx："));
+
+    let patch = dir.join("tweak.json");
+    fs::write(
+        &patch,
+        r#"{ "styles": { "GbBody": { "run": { "size_step": 1 } } } }"#,
+    )
+    .unwrap();
+    let patched_path = dir.join("patched.docx");
+    let patched = charta()
+        .args([
+            "reference",
+            "--backend",
+            "general",
+            "--styles",
+            patch.to_str().unwrap(),
+            "--output",
+            patched_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_ok(&patched);
+    assert_ne!(fs::read(&patched_path).unwrap(), bytes);
+
+    let unknown = charta()
+        .args(["reference", "--backend", "notice"])
+        .output()
+        .unwrap();
+    assert_eq!(unknown.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&unknown.stderr).contains("未知后端"));
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn reports_are_written_only_when_requested() {
+    let dir = work_dir("report-opt");
+    let input = dir.join("general.md");
+    fs::write(
+        &input,
+        "---\nauthor: 张三\ndate: 2026-10-25\n---\n\n# 材料标题\n\n正文。\n",
+    )
+    .unwrap();
+
+    let plain = charta()
+        .args([
+            "convert",
+            input.to_str().unwrap(),
+            "--output",
+            dir.join("plain.docx").to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_ok(&plain);
+    assert!(dir.join("plain.docx").exists());
+    assert!(!dir.join("plain.report.json").exists());
+    assert!(!dir.join("plain.report.md").exists());
+    assert!(!String::from_utf8_lossy(&plain.stdout).contains("报告："));
+
+    let json_only = charta()
+        .args([
+            "convert",
+            input.to_str().unwrap(),
+            "--output",
+            dir.join("json.docx").to_str().unwrap(),
+            "--report",
+            dir.join("json.report.json").to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_ok(&json_only);
+    assert!(dir.join("json.report.json").exists());
+    assert!(!dir.join("json.report.md").exists());
+    assert_eq!(report(&dir.join("json.report.json"))["backend"], "general");
 
     let _ = fs::remove_dir_all(&dir);
 }

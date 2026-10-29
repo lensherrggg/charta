@@ -112,6 +112,38 @@ mod tests {
     }
 
     #[test]
+    fn writes_tabs_fields_and_update_fields_setting() {
+        let mut docx = Docx::new();
+        docx.update_fields = true;
+        let mut paragraph = Paragraph::text("");
+        paragraph.formatting.tabs.push(TabStop {
+            position_twips: 8844,
+            alignment: TabAlignment::Right,
+            leader: TabLeader::Dot,
+        });
+        paragraph.runs = vec![
+            Run::field_begin(),
+            Run::instruction(" TOC \\o \"1-1\" "),
+            Run::field_separate(),
+            Run::field_end(),
+        ];
+        docx.add_paragraph(paragraph);
+
+        let bytes = docx.to_bytes().unwrap();
+        let body = read_part(&bytes, "word/document.xml");
+        let settings = read_part(&bytes, "word/settings.xml");
+        assert!(body
+            .contains("<w:tabs><w:tab w:val=\"right\" w:leader=\"dot\" w:pos=\"8844\"/></w:tabs>"));
+        assert!(body.contains("<w:fldChar w:fldCharType=\"begin\" w:dirty=\"true\"/>"));
+        assert!(
+            body.contains("<w:instrText xml:space=\"preserve\"> TOC \\o \"1-1\" </w:instrText>")
+        );
+        assert!(body.contains("<w:fldChar w:fldCharType=\"separate\"/>"));
+        assert!(body.contains("<w:fldChar w:fldCharType=\"end\"/>"));
+        assert!(settings.contains("<w:updateFields w:val=\"true\"/>"));
+    }
+
+    #[test]
     fn writes_a_complete_package() {
         let mut docx = Docx::new();
         docx.styles.default_font = Some("Times New Roman".to_owned());

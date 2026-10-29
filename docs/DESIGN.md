@@ -302,7 +302,7 @@ Typst 没有 front matter。Charta 在主文件的第一个非空行读取原生
 
 0.1.0 落地情况：列表已按 FR-IR-4 记录 `ordered`/`start`，嵌套通过 `ListItem.children` 表达；Markdown 与 Typst 前端都保留列表层级，列表序号不写入 IR。列表仍使用 `（1）` / `①` / `A.` / `a.` 四级静态序数，第五级起回落正文。`charta-docx-kit` 的 `numbering.xml` 构建能力只用于标题，列表不挂 `numPr`。
 
-标题自动编号通过引擎控制元数据 `_charta.heading_numbering: true|false` 显式开启或关闭，并写入未带前端建议的标题节点。默认不自动编号，避免与作者手写的“一、”重复。GB/T 9704 后端对请求自动编号的标题使用 Word 内置多级列表，生成 `一、` / `（一）` / `1.` / `（1）` 四级编号，超过四级不编号并报告 `heading_numbering_flattened`；首次生成报告 `heading_numbering_word`，说明编号由 Word 维护、纯文本抽取不含编号文字。通用材料模板的 `#` 是大标题、不编号，`##` 起才对应这四级。下级是否随上级变更重置由 `numbering.heading.restart` 控制：默认按 Word 规则重置，可整体关闭，或指定从第几级起不再重置（写入 `w:lvlRestart w:val="0"`）。样式数据缺少 `numbering.heading` 时回退为静态文本，并报告 `heading_numbering_static`。IR 的 `auto_number: Option<bool>` 已支持逐标题覆盖，前端语法尚未提供。
+标题自动编号通过引擎控制元数据 `_charta.heading_numbering: true|false` 显式开启或关闭，并写入未带前端建议的标题节点。默认不自动编号，避免与作者手写的“一、”重复。GB/T 9704 后端对请求自动编号的标题使用 Word 内置多级列表，生成 `一、` / `（一）` / `1.` / `（1）` 四级编号，超过四级不编号并报告 `heading_numbering_flattened`；首次生成报告 `heading_numbering_word`，说明编号由 Word 维护、纯文本抽取不含编号文字。通用材料模板的 `#` 是大标题、不编号，`##` 起才对应这四级；文件汇编模板的 `#` 是篇章标题、同样不编号，`##` 起默认自动编号，可用 `_charta.heading_numbering: false` 关闭。下级是否随上级变更重置由 `numbering.heading.restart` 控制：默认按 Word 规则重置，可整体关闭，或指定从第几级起不再重置（写入 `w:lvlRestart w:val="0"`）。样式数据缺少 `numbering.heading` 时回退为静态文本，并报告 `heading_numbering_static`。IR 的 `auto_number: Option<bool>` 已支持逐标题覆盖，前端语法尚未提供。
 
 图片题注不进入标题编号体系：IR 1.1 的 `ImageBlock` 增加可选 `caption` 字段（带默认值的兼容增项），前端把 Markdown 图片 title 写入其中；GB/T 9704 后端按带题注图片的出现顺序生成静态 `图 N`，首次生成报告 `image_caption_static`。无 `caption` 的图片不编号。
 
@@ -427,7 +427,10 @@ pub trait Backend: Send + Sync {
 | `layout/record.rs` | 版记：末节底端对齐、抄送与印发机关/日期表格 |
 | `layout/text.rs` | run 构建、样式意图采纳与覆盖记录 |
 | `layout/footer.rs` | 奇偶页页码 |
+| `layout/cover.rs` | 文件汇编封面（空行、标题、日期） |
+| `layout/toc.rs` | 目录页与 Word TOC 域 |
 | `numbering.rs` | 列表静态序数、标题编号状态与静态回退（FR-IR-5） |
+| `pandoc.rs` | 由样式数据派生 pandoc `reference.docx`（样式 ID 映射为内置英文名） |
 | `report.rs` | 后端报告的消息、代码与严重级别 |
 
 边界：数据管“值”，流程代码管“怎么拼”，`charta-docx-kit` 管“机械操作”，引擎管“调度、schema 校验与报告结构”。同一规范族内的轻量模板可共用一个后端 crate；文种结构差异大时再新建 crate，复用核心、工具箱和样式加载模式。
@@ -437,16 +440,36 @@ pub trait Backend: Send + Sync {
 `general` 与通知共用同一个后端 crate 和 `layout/` 流程，通过 `Gb9704Template::General` 选择。CLI 默认后端是 `general`；库层 `Gb9704Options::default()` 与 `Gb9704Backend` 仍以 `Notice` 为准，需要完整通知时由调用方或 CLI 显式选择。
 
 - 无版头、无版记；页面设置、页码、列表、表格、图片与题注流程复用。
-- 元数据：`author`、`date` 必填，`recipient` 可选。大标题取自正文第一个一级标题（`#`），元数据不再提供 `title`；若仍提供会报告 `metadata_ignored`。docx 的 `dc:title` 同样取该一级标题。
+- 元数据：`author`、`date`、`recipient` 均可选，两个署名项都不填时不生成署名区。大标题取自正文第一个一级标题（`#`），元数据不再提供 `title`；若仍提供会报告 `metadata_ignored`。docx 的 `dc:title` 同样取该一级标题。
 - 标题层级整体比通知下移一级：`#` 用大标题样式（方正小标宋_GBK 二号），`##` 用一级标题样式，`###` 用二级标题样式，`####` 及更深用三级标题样式。自动编号相应下移：`#` 不编号，`##`–`#####` 对应 `一、` / `（一）` / `1.` / `（1）`，`######` 及更深报告 `heading_numbering_flattened`。
 - 每个 `#` 开启新的标题编号区段：后端为第一个区段使用样式数据的编号定义，之后每个 `#` 分配新的抽象编号/编号实例 ID（内容沿用同一份定义），使其后 `##` 从 `一、` 重新开始；静态文本回退同样在每个 `#` 处清零各级计数。第二个及以后的 `#` 仍只按大标题渲染，不重复署名区。区段内部的下级重置仍由 `numbering.heading.restart` 控制。
-- 署名区紧跟在第一个一级标题之后、正文之前，分两行居中：第一行姓名，第二行 `（YYYY年M月D日）`。姓名恰好两个字符时中间插入一个全角空格；三字及以上原样。GB/T 9704 没有直接规定姓名字距，这是常见排版惯例，单位模板优先。
+- 标题同时写入 `w:outlineLvl`（`#` 为 0，逐级递增），Word 导航窗格可以直接折叠跳转；引用块里的标题不写大纲级别。
+- 署名区紧跟在第一个一级标题之后、正文之前，分两行居中：第一行姓名，第二行 `（YYYY年M月D日）`。姓名与日期都可省略：只提供一项时只生成对应一行，两项都未提供时不生成署名区。姓名恰好两个字符时中间插入一个全角空格；三字及以上原样。GB/T 9704 没有直接规定姓名字距，这是常见排版惯例，单位模板优先。
 - `recipient` 位于署名区之后、正文之前，左对齐，后端补全角冒号。
 - 样式数据：`data/general-styles.json`。大标题方正小标宋_GBK 二号；一级标题（`##`）方正黑体_GBK 三号；二级标题（`###`）方正楷体_GBK 三号加粗；三级及以下（`####` 等）方正仿宋_GBK 三号不加粗；正文方正仿宋_GBK 三号。
 - 行内强调：`strong` 使用 `GbStrong`（方正楷体_GBK 加粗），`emphasis` 使用 `GbEmphasis`（方正楷体_GBK 不加粗、不生成斜体）；通知模板保持原有行为。两套样式 ID 都来自样式数据，不在流程中内联字体名。
 - 样式外部化与局部微调：`GeneralBackend::with_style_file(path)` 按 `StyleSet::General` 加载完整文件或补丁；`--styles` 补丁可以只改 `GbBody` 的字号、`GbStrong` 的字体等单项。例如 `GbBody.run.size_step: 1` 把正文 16pt 提到 18pt，标题和表格保持原值；行内 `strong` 的字号跟随所在段落，字体和加粗取自 `GbStrong`。
 
 `Gb9704Options.template` 只影响行内强调与模板选择；通知的默认值不变，输出与加入通用材料前逐字节一致。
+
+### 6.9 文件汇编模板（compilation）
+
+`compilation` 与通用材料共用 `StyleSet::General` 样式集和正文流程，通过 `Gb9704Template::Compilation` 选择，额外生成封面和目录页。schema 要求 `title`、`date`，`date_style` 可选（`arabic` 默认，`chinese` 为汉字日期）。
+
+- 封面：5 个 `CoverSpacer` 空段 → `CoverTitle`（方正小标宋_GBK 二号，居中）→ 7 个空段 → `CoverDate`（方正楷体_GBK 二号，居中），三者行距均为 1.5 倍。`date_style: chinese` 输出 `二〇二六年十月二十五日`。
+- 目录：紧接封面的单独一页，`TocTitle`（“目　　录”，中间 2 个全角空格，方正小标宋_GBK 二号）+ `TOCSpacer`（三号字空行）+ Word TOC 域 `TOC \o "1-1" \h \z \u`；条目套 `TOC1`（方正楷体_GBK 三号、无缩进、单倍行距、段前段后 6 磅、156 mm 右对齐点线制表位），写入 `w:updateFields`。
+- 分节与页码：封面与目录合成一节，节属性不带页脚引用，不显示页码；正文从下一节开始显示页码，`w:pgNumType w:start="1"` 让正文从 1 起编。每个 `#` 篇章之间用普通分页符（`w:br w:type="page"`）隔开，正文保持同一节，页码连续。页脚沿用 `footer` 配置的奇偶页区分：奇数页居右、偶数页居左，写入 `w:evenAndOddHeaders`。
+- 正文：`#` 为篇章标题，使用 `GbTitle` 样式但不编号；`##` 起按通用模板四级编号（`一、` / `（一）` / `1.` / `（1）`），每个 `#` 重开编号区段；标题写 `outlineLvl`。不生成署名区、主送机关和附件说明，`author` / `recipient` 若提供会报告 `metadata_ignored`。
+- 封面、目录与正文样式都在 `general-styles.json`；`CompilationBackend` 提供 `try_new` / `try_with_styles` / `with_styles` / `with_style_file`，补丁与通用模板一致。
+
+### 6.10 pandoc reference.docx
+
+`Gb9704Styles::pandoc_reference_docx()` 用样式数据生成 pandoc 的 `reference.docx`；CLI 入口为 `charta reference`。pandoc 按 Word 内置样式 ID 取样式，而 Charta 的 `Gb*` ID 带规范语义，因此生成时只改 ID 与显示名，格式值全部沿用样式数据：
+
+- 映射：`GbTitle`→`Title`、`GbByline`→`Author`、`GbDate`→`Date`、`GbBody`→`BodyText`、`GbHeading1`–`3`→`Heading1`–`3`、`GbQuote`→`BlockText`、`GbTableCaption`→`TableCaption`、`GbImageCaption`→`ImageCaption`、`TocTitle`→`TOCHeading`。
+- 派生：`BodyText` 复制出 `FirstParagraph` 与 `Compact`（去掉首行缩进），`GbByline`（通用材料）复制出 `Date`，`Heading3` 复制出 `Heading4`–`Heading9`，避免 pandoc 的首段、紧凑列表、元数据日期和四级以下标题无样式可用。
+- 无对应角色的样式（封面、`TOC1`、行内强调、页码等）保留原 ID，可经 `custom-style` 使用；源样式被改名后不再存在。
+- 生成物只含样式与页面设置，不含编号定义；pandoc 会以它为基础包生成正文。`--styles` 补丁先生效再映射，`--backend` 决定使用通知或通用材料样式集。
 
 ## 7. docx 工具箱
 
@@ -459,7 +482,9 @@ pub trait Backend: Send + Sync {
 - 图片嵌入（PNG/JPEG/GIF 尺寸识别、关系、media 部件、drawing XML）
 - 节垂直对齐（`vAlign`）
 - 编号定义
-- PAGE 域
+- PAGE 域与其他通用域（`fldChar`/`instrText`）
+- 制表位（含点线前导）
+- 段落大纲级别、分页符、打开时更新域
 - 奇偶页页脚
 - 段落下边框（红线、版记线）
 
@@ -559,7 +584,7 @@ parse → 角色声明/校验 → strict 升级 → schema 校验 → [阻断? �
 | 3 | 扩展角色注册 | 运行期 `RoleRegistry`；文档用 `_charta.roles` 声明；后端 `roles()` 注册 | 避免编译期耦合，便于后端独立扩展 |
 | 4 | docx-kit 与核心兼容 | 0.1.x 锁步；kit 可独立使用 | 第一期接口仍在快速演进，锁步降低组合风险 |
 | 5 | 报告消费方 | 同时面向人工与程序化 | JSON 1.0 稳定，Markdown 供审阅 |
-| 6 | CLI 输入输出 | 单文档；默认同名输出；JSON+Markdown 报告；退出码 0/1/2 | 目录批处理列入三期 |
+| 6 | CLI 输入输出 | 单文档；默认同名输出；可选 JSON/Markdown 报告；退出码 0/1/2 | 目录批处理列入三期 |
 | 7 | 后续模板策略 | 引擎不感知；由各后端自行决定 | GB 后端第一期从零生成，验证零模板路径 |
 
 ## 12. 验收标准对应

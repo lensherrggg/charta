@@ -81,6 +81,18 @@ pub(crate) fn paragraph_properties_xml(
             color_hex(shading)
         ));
     }
+    if !formatting.tabs.is_empty() {
+        inner.push_str("<w:tabs>");
+        for tab in &formatting.tabs {
+            inner.push_str(&format!(
+                "<w:tab w:val=\"{}\" w:leader=\"{}\" w:pos=\"{}\"/>",
+                tab.alignment.xml_value(),
+                tab.leader.xml_value(),
+                tab.position_twips
+            ));
+        }
+        inner.push_str("</w:tabs>");
+    }
     let spacing = spacing_xml(&formatting.spacing);
     if !spacing.is_empty() {
         inner.push_str(&spacing);

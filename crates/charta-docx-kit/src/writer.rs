@@ -1,6 +1,6 @@
 use crate::model::{
-    BodyItem, CoreProperties, Docx, Footer, NumberingDefinition, NumberingLevel, PageSetup,
-    Paragraph, Run, RunContent, StyleDefinition, StyleKind, Table, TableCell,
+    BodyItem, CoreProperties, Docx, FieldCharType, Footer, NumberingDefinition, NumberingLevel,
+    PageSetup, Paragraph, Run, RunContent, StyleDefinition, StyleKind, Table, TableCell,
 };
 use crate::xml::{
     border_xml, color_hex, escape_attr, escape_text, mm_to_twips, paragraph_properties_xml,
@@ -122,7 +122,7 @@ pub(crate) fn write(docx: &Docx) -> Result<Vec<u8>> {
 
     let document = document_xml(docx, &refs, &image_refs);
     let styles = styles_xml(docx);
-    let settings = settings_xml(docx.footers.even.is_some());
+    let settings = settings_xml(docx.footers.even.is_some(), docx.update_fields);
 
     let mut content_type_overrides: Vec<(String, String)> = vec![
         (
@@ -242,9 +242,14 @@ fn document_xml(docx: &Docx, refs: &FooterRefs, image_refs: &[ImageRef]) -> Stri
                 body.push_str("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>");
             }
             BodyItem::SectionBreak(section) => {
+                let section_refs = if section.footer {
+                    refs
+                } else {
+                    &FooterRefs::default()
+                };
                 let sect = sect_pr_xml(
                     &section.page,
-                    refs,
+                    section_refs,
                     Some(if section.continuous {
                         "continuous"
                     } else {
@@ -301,6 +306,9 @@ fn sect_pr_xml(page: &PageSetup, refs: &FooterRefs, section_type: Option<&str>) 
         mm_to_twips(page.header_mm),
         mm_to_twips(page.footer_mm)
     ));
+    if let Some(start) = page.page_number_start {
+        inner.push_str(&format!("<w:pgNumType w:start=\"{start}\"/>"));
+    }
     inner.push_str("<w:cols w:space=\"425\"/>");
     if let Some(alignment) = page.vertical_alignment {
         inner.push_str(&format!("<w:vAlign w:val=\"{}\"/>", alignment.xml_value()));
@@ -374,6 +382,24 @@ fn run_xml(run: &Run, image_refs: &[ImageRef], drawing_id: &mut u32) -> String {
             *drawing_id += 1;
             format!("<w:r>{rpr}{}</w:r>", image_drawing_xml(image, *drawing_id))
         }
+        RunContent::FieldChar(kind) => {
+            let kind = match kind {
+                FieldCharType::Begin => "begin",
+                FieldCharType::Separate => "separate",
+                FieldCharType::End => "end",
+            };
+            let dirty = if kind == "begin" {
+                " w:dirty=\"true\""
+            } else {
+                ""
+            };
+            format!("<w:r>{rpr}<w:fldChar w:fldCharType=\"{kind}\"{dirty}/></w:r>")
+        }
+        RunContent::Instruction(text) => format!(
+            "<w:r>{rpr}<w:instrText xml:space=\"preserve\">{}</w:instrText></w:r>",
+            escape_text(text)
+        ),
+        RunContent::PageBreak => format!("<w:r>{rpr}<w:br w:type=\"page\"/></w:r>"),
     }
 }
 
@@ -659,11 +685,14 @@ fn footer_xml(footer: &Footer, image_refs: &[ImageRef]) -> String {
     xml
 }
 
-fn settings_xml(even_and_odd: bool) -> String {
+fn settings_xml(even_and_odd: bool, update_fields: bool) -> String {
     let mut xml = format!("{XML_DECL}<w:settings xmlns:w=\"{NS_W}\">");
     xml.push_str("<w:zoom w:percent=\"100\"/>");
     if even_and_odd {
         xml.push_str("<w:evenAndOddHeaders/>");
+    }
+    if update_fields {
+        xml.push_str("<w:updateFields w:val=\"true\"/>");
     }
     xml.push_str(
         "<w:defaultTabStop w:val=\"420\"/><w:compat><w:compatSetting w:name=\"compatibilityMode\" w:uri=\"http://schemas.microsoft.com/office/word\" w:val=\"15\"/></w:compat><w:themeFontLang w:val=\"en-US\" w:eastAsia=\"zh-CN\"/></w:settings>",

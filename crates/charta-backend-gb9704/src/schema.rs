@@ -27,8 +27,18 @@ pub(crate) fn build_schema(header: bool) -> MetadataSchema {
 
 pub(crate) fn build_general_schema() -> MetadataSchema {
     MetadataSchema::new(vec![
-        FieldSchema::string("author", true).describe("姓名"),
-        FieldSchema::date("date", true).describe("日期（YYYY-MM-DD）"),
+        FieldSchema::string("author", false).describe("姓名；与日期都省略时不生成署名行"),
+        FieldSchema::date("date", false).describe("日期（YYYY-MM-DD）；与姓名都省略时不生成署名行"),
         FieldSchema::string("recipient", false).describe("主送机关，末尾冒号由后端补齐"),
+    ])
+}
+
+pub(crate) fn build_compilation_schema() -> MetadataSchema {
+    MetadataSchema::new(vec![
+        FieldSchema::string("title", true).describe("封面标题（方正小标宋_GBK 二号）"),
+        FieldSchema::date("date", true).describe("封面日期（YYYY-MM-DD）"),
+        FieldSchema::enumeration("date_style", false, ["arabic", "chinese"]).describe(
+            "封面日期写法：arabic 为 2026年10月25日（默认），chinese 为二〇二六年十月二十五日",
+        ),
     ])
 }

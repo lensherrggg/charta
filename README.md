@@ -6,7 +6,7 @@ Charta（拉丁语 *charta*，纸、文书）是一个以**语义 IR** 为核心
 
 - IR 格式：`1.1`
 - 报告格式：`1.0`
-- 第一期后端：GB/T 9704-2012 通知；通用材料（方正 GBK）
+- 第一期后端：GB/T 9704-2012 通知；通用材料（方正 GBK）；文件汇编（方正 GBK）
 
 ## 设计要点
 
@@ -69,6 +69,15 @@ cargo run -p charta-cli -- convert examples/general.md \
   --output out/general.docx \
   --report out/general.report.json \
   --report-md out/general.report.md
+```
+
+### 转换 Markdown 文件汇编
+
+```bash
+cargo run -p charta-cli -- convert examples/compilation.md --backend compilation \
+  --output out/compilation.docx \
+  --report out/compilation.report.json \
+  --report-md out/compilation.report.md
 ```
 
 ### 转换 Typst 通知（含字面量 include）
@@ -188,7 +197,7 @@ cargo run -p charta-cli -- schema --backend general
 
 `general` 是 CLI 默认后端，用于日常小材料：不带版头、版记，适合通知、工作安排、情况说明等短材料。需要完整公文形态时显式加 `--backend gb9704`。
 
-大标题取自正文第一个一级标题（`#`），不用元数据 `title`；元数据只放署名和主送：
+大标题取自正文第一个一级标题（`#`），不用元数据 `title`；元数据只放署名和主送，署名两行都可省略：
 
 ```yaml
 ---
@@ -211,6 +220,7 @@ recipient: 各部门
 - 大标题（`#`）：方正小标宋_GBK，二号，居中。
 - 姓名：方正楷体_GBK，三号，居中，两字姓名中间加一个全角空格。
 - 日期：方正楷体_GBK，三号，居中，两侧加全角括号，例如 `（2026年10月25日）`。姓名与日期分两行。
+- `author` 与 `date` 都可省略：只给一个就只生成对应一行；两个都不给就不生成署名区，大标题后直接接正文或主送机关。
 - `recipient` 可选：日期行之后左对齐，自动补全角冒号；不填就不生成。
 - 正文：方正仿宋_GBK，三号。
 - 一级标题（`##`）：方正黑体_GBK，三号。
@@ -221,10 +231,53 @@ recipient: 各部门
 
 标题层级整体比通知后端下移一级：通知的 `#` 是一级标题，通用材料的 `#` 是大标题，编号也从 `##` 开始（`#` 不编号）。出现多个 `#` 时，每个 `#` 开启新的编号区段，其后的 `##` 从 `一、` 重新编号；第二个及以后的 `#` 只按大标题排版，不重复姓名和日期。两字姓名中间加一个全角空格（`张三` → `张　三`），三字及以上原样。这是常见排版惯例，GB/T 9704 没有直接条款；单位另有模板时以模板为准。字体名按方正 GBK 名称写入 docx，目标机器未安装时由 Word 替换显示。
 
+通用模板不带目录；需要封面 + 目录的汇编材料请用 `compilation` 后端。
+
+### 文件汇编模板（compilation）
+
+`compilation` 用于把多篇材料合成一本汇编：封面、目录、正文三段式，正文样式与通用模板一致。CLI 显式传 `--backend compilation`。
+
+```yaml
+---
+title: 2026 年度重点工作文件汇编
+date: 2026-10-25
+# date_style: chinese   # 可选；默认阿拉伯数字
+---
+
+# 第一篇材料标题
+
+## 总体要求
+
+### 明确责任
+```
+
+- 封面：先空 5 行，写标题（方正小标宋_GBK 二号），再空 7 行，写日期（方正楷体_GBK 二号），行距 1.5 倍。日期默认 `2026年10月25日`；`date_style: chinese` 时写 `二〇二六年十月二十五日`。
+- 目录：单独一页，标题“目　　录”（方正小标宋_GBK 二号，中间 2 个全角空格），标题下空一行三号字；条目收 `#` 级篇章标题，方正楷体_GBK 三号、无缩进、单倍行距、段前段后 6 磅，标题后接点线、页码右对齐。
+- 正文：`#` 是篇章标题，不编号；`##` 起按通用模板的四级编号依次生成 `一、` / `（一）` / `1.` / `（1）`，每个 `#` 开启新的编号区段。其余字体、列表、表格、图片与通用模板一致，不再重复署名和日期。
+- 分页与页码：封面和目录单独成节，不显示页码；每个 `#` 篇章另起一页（普通分页符），正文页码从 1 开始连续编号。页码分奇偶页：奇数页居右、偶数页居左，均带一字线。
+- 目录是 Word 的 TOC 域，页码由 Word 排版后生成；文档设置了打开时更新域，Word 打开后自动补全。WPS 或未更新域时需要手动“更新域”。
+- 目录标题与条目样式分别为 `TocTitle`、`TOC1`，封面样式为 `CoverSpacer` / `CoverTitle` / `CoverDate`，都在 `general-styles.json` 中，可用 `--styles` 补丁调整。
+
+### 生成 pandoc reference.docx
+
+把样式数据映射成 pandoc 认得的 Word 内置样式 ID，供 `pandoc --reference-doc` 使用：
+
+```bash
+cargo run -p charta-cli -- reference --backend general --output pandoc-reference.docx
+pandoc 材料.md --reference-doc pandoc-reference.docx -o 材料.docx
+```
+
+- 映射：`GbTitle`→`Title`、`GbByline`→`Author`、`GbDate`→`Date`、`GbBody`→`Body Text`、`GbHeading1`–`3`→`Heading 1`–`3`、`GbQuote`→`Block Text`、表格/图片题注→`Table Caption`/`Image Caption`、`TocTitle`→`TOC Heading`。
+- 另按正文、署名和三级标题补出 `First Paragraph`、`Compact`、`Date`、`Heading 4`–`9`，避免 pandoc 的首段、紧凑列表、元数据日期和四级以下标题落回 Normal。
+- 没有对应角色的样式（封面、目录条目、行内强调、页码等）保留原 ID，pandoc 可用 `custom-style` 引用。
+- `--styles` 可传完整样式文件或补丁，先定制样式再映射；`--backend` 支持 `general`、`compilation`、`gb9704`。
+- 层级口径不同：pandoc 的 `#` 对应 `Heading 1`，而 Charta 通用模板的 `#` 是大标题；用这份参考样式排版时，Markdown 标题层级按 pandoc 习惯写。
+
 ## CLI
 
 ```
 charta convert <INPUT> [OPTIONS]
+charta reference [OPTIONS]
 charta backends
 charta schema --backend <ID> [--json]
 charta --version
@@ -235,10 +288,10 @@ charta --version
 | 参数 | 说明 |
 |---|---|
 | `--frontend auto\|md\|typst` | 默认按扩展名判断 |
-| `--backend <ID>` | 默认 `general`（通用材料）；可选 `gb9704`（通知） |
+| `--backend <ID>` | 默认 `general`（通用材料）；可选 `compilation`（文件汇编）、`gb9704`（通知） |
 | `-o, --output <PATH>` | docx 路径，默认与源文件同名 |
-| `--report <PATH>` | JSON 报告，默认 `<output>.report.json` |
-| `--report-md <PATH>` | Markdown 报告，默认 `<output>.report.md` |
+| `--report <PATH>` | JSON 报告路径；不传则不生成文件 |
+| `--report-md <PATH>` | Markdown 报告路径；不传则不生成文件 |
 | `--emit-ir <PATH>` | 额外输出 IR JSON |
 | `--strict` | 契约外语法升级为阻断 |
 | `--styles <PATH>` | 外部样式 JSON：完整样式文件或只含改动项的补丁 |
@@ -249,6 +302,8 @@ charta --version
 | `--adopt-font-size <BOOL>` | 是否采纳字号意图，默认 `false` |
 | `--adopt-bold <BOOL>` | 是否采纳加粗意图，默认 `false` |
 | `--adopt-italic <BOOL>` | 是否采纳斜体意图，默认 `false` |
+
+`reference` 的参数：`--backend <ID>`（`general` / `compilation` / `gb9704`）、`-o, --output <PATH>`（默认 `pandoc-reference.docx`）、`--styles <PATH>`（同上）。
 
 退出码：
 
@@ -326,7 +381,7 @@ Typst 表格只接受字面量子集：`columns` 为整数或元组（元组只�
 
 ### 元数据入口
 
-引擎不定义字段语义，元数据由目标后端的 schema 校验。建议通用字段命名：`title`、`date`、`author`。通用材料后端要求 `author`、`date`，`recipient` 可选；大标题取自正文第一个一级标题，元数据 `title` 不再使用（仍提供会报告 `metadata_ignored`）。GB/T 9704 后端要求：
+引擎不定义字段语义，元数据由目标后端的 schema 校验。建议通用字段命名：`title`、`date`、`author`。通用材料后端的 `author`、`date`、`recipient` 都可选，`author` 与 `date` 都不填时不生成署名区；大标题取自正文第一个一级标题，元数据 `title` 不再使用（仍提供会报告 `metadata_ignored`）。GB/T 9704 后端要求：
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|:---:|---|
@@ -391,7 +446,7 @@ Typst：
 
 开启后，未带前端建议的标题都会请求自动编号。GB/T 9704 后端使用 Word 内置多级列表生成 `一、` / `（一）` / `1.` / `（1）` 四级编号，第三级 `1.` 与标题文字之间保留一个空格（`1. 标题`），其余级不加后缀空格；编号定义写入 `numbering.xml`，在 Word 中增删标题会自动重排。超过四级不编号并报告 `heading_numbering_flattened`；首次生成报告 `heading_numbering_word`，提示编号由 Word 维护、纯文本抽取不包含编号文字。`heading_numbering: false` 显式关闭。
 
-通用材料模板的 `#` 是大标题，不编号；从 `##` 开始按上述四级编号依次对应 `一、` / `（一）` / `1.` / `（1）`，`#####` 及更深层级报告 `heading_numbering_flattened`。每个 `#` 开启新的编号区段，其后的 `##` 从 `一、` 重新开始；第二个及以后的 `#` 只按大标题排版，不重复署名区。区段内部的下级是否随上级重置，由样式数据 `numbering.heading.restart` 控制（见“标题编号的重置规则”）。
+通用材料模板的 `#` 是大标题，不编号；从 `##` 开始按上述四级编号依次对应 `一、` / `（一）` / `1.` / `（1）`，`#####` 及更深层级报告 `heading_numbering_flattened`。每个 `#` 开启新的编号区段，其后的 `##` 从 `一、` 重新开始；第二个及以后的 `#` 只按大标题排版，不重复署名区。区段内部的下级是否随上级重置，由样式数据 `numbering.heading.restart` 控制（见“标题编号的重置规则”）。文件汇编模板默认开启标题编号（`#` 篇章标题不编号，`##` 起编号），可用 `_charta.heading_numbering: false` 关闭。
 
 列表编号仍是后端生成的静态文本，不使用 Word 列表编号。若外部样式数据没有 `numbering.heading` 定义，标题会回退到静态文本编号并报告 `heading_numbering_static`。
 

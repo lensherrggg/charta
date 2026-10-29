@@ -11,23 +11,27 @@
 //!
 //! No external `.docx` template is required or referenced.
 
-use charta::{Backend, Issue, Metadata, MetadataSchema, RenderOutput, RenderRequest, Result};
+use charta::{
+    Backend, Issue, MetaValue, Metadata, MetadataSchema, RenderOutput, RenderRequest, Result,
+};
 use charta_docx_kit::{CoreProperties, Docx};
 
 mod layout;
 mod numbering;
+mod pandoc;
 mod report;
 mod schema;
 mod styles;
 
 pub use styles::{Gb9704Styles, StyleSet};
 
-use schema::{build_general_schema, build_schema};
+use schema::{build_compilation_schema, build_general_schema, build_schema};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Gb9704Template {
     Notice,
     General,
+    Compilation,
 }
 
 #[derive(Debug, Clone)]
@@ -70,6 +74,15 @@ impl Gb9704Options {
     pub(crate) fn general() -> Self {
         Self {
             template: Gb9704Template::General,
+            header: false,
+            record: false,
+            ..Self::default()
+        }
+    }
+
+    pub(crate) fn compilation() -> Self {
+        Self {
+            template: Gb9704Template::Compilation,
             header: false,
             record: false,
             ..Self::default()
@@ -317,6 +330,16 @@ impl Backend for GeneralBackend {
                 "通用材料以一级标题作为大标题，元数据 title 不参与渲染",
             ));
         }
+        if metadata
+            .get("_charta")
+            .and_then(MetaValue::as_map)
+            .is_some_and(|control| control.contains_key("toc"))
+        {
+            issues.push(report::ignored_metadata(
+                "_charta.toc",
+                "通用材料不生成目录页，需要封面和目录请使用 compilation 后端",
+            ));
+        }
 
         layout::body::render_general(
             &mut docx,
@@ -330,6 +353,106 @@ impl Backend for GeneralBackend {
         let bytes = docx
             .to_bytes()
             .map_err(|error| charta::Error::backend("general", error.to_string()))?;
+        Ok(RenderOutput::with_issues(bytes, issues))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CompilationBackend {
+    schema: MetadataSchema,
+    styles: Gb9704Styles,
+}
+
+impl Default for CompilationBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CompilationBackend {
+    /// # Panics
+    ///
+    /// Panics if the embedded compilation style data is invalid.
+    pub fn new() -> Self {
+        Self::try_new().expect("内置文件汇编样式数据必须有效")
+    }
+
+    pub fn try_new() -> charta::Result<Self> {
+        Self::try_with_styles(Gb9704Styles::embedded_general()?)
+    }
+
+    pub fn try_with_styles(styles: Gb9704Styles) -> charta::Result<Self> {
+        styles.validate(StyleSet::General)?;
+        Ok(Self {
+            schema: build_compilation_schema(),
+            styles,
+        })
+    }
+
+    pub fn with_styles(styles: Gb9704Styles) -> Self {
+        Self::try_with_styles(styles).expect("文件汇编样式数据必须包含完整样式集")
+    }
+
+    pub fn with_style_file(path: impl AsRef<std::path::Path>) -> charta::Result<Self> {
+        Self::try_with_styles(Gb9704Styles::from_external_for(path, StyleSet::General)?)
+    }
+
+    pub fn styles(&self) -> &Gb9704Styles {
+        &self.styles
+    }
+}
+
+impl Backend for CompilationBackend {
+    fn id(&self) -> &'static str {
+        "compilation"
+    }
+
+    fn display_name(&self) -> &str {
+        "文件汇编（方正 GBK）"
+    }
+
+    fn schema(&self) -> &MetadataSchema {
+        &self.schema
+    }
+
+    fn render(&self, request: RenderRequest<'_>) -> Result<RenderOutput> {
+        let metadata = request.metadata;
+        let mut issues = Vec::new();
+        let options = Gb9704Options::compilation();
+        let mut docx = Docx::new();
+        docx.page = self.styles.page().setup();
+        docx.styles = self.styles.stylesheet();
+        docx.core = CoreProperties {
+            title: layout::string_field(metadata, "title").map(str::to_owned),
+            creator: None,
+            subject: None,
+            created: None,
+        };
+        docx.footers = layout::footer::build(&self.styles);
+        docx.update_fields = true;
+
+        layout::cover::render(&mut docx, metadata, &self.styles);
+        layout::toc::render(&mut docx, &self.styles);
+        layout::body::render_compilation_content(
+            &mut docx,
+            &request.document.blocks,
+            &options,
+            &self.styles,
+            &mut issues,
+        );
+
+        for (field, reason) in [
+            ("author", "文件汇编封面不含署名，作者不参与渲染"),
+            ("recipient", "文件汇编封面不含主送机关，该字段不参与渲染"),
+        ] {
+            if metadata.get(field).is_some() {
+                issues.push(report::ignored_metadata(field, reason));
+            }
+        }
+
+        let bytes = docx
+            .to_bytes()
+            .map_err(|error| charta::Error::backend("compilation", error.to_string()))?;
         Ok(RenderOutput::with_issues(bytes, issues))
     }
 }
