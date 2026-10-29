@@ -6,6 +6,7 @@
 
 ### Changed
 
+- 通知的署名与日期右空改为行尾普通空格：按样式 `right_chars`（署名 4 字、日期 2 字）换算，16 pt 下每字 4 个空格，段右缩进清零并写 `wordWrap=0`（Word/WPS 默认忽略右对齐段的行尾空格，关闭后才计入）。生成后可直接在 Word 里增删空格调整位置，不再依赖段右缩进。
 - 后端 crate 由 `charta-backend-gb9704` 更名为 `charta-backend-cn`：它同时承载通知、通用材料和文件汇编，不再以单一国标命名；共享类型 `Gb9704Styles` / `Gb9704Options` / `Gb9704Template` 改为 `DocStyles` / `DocOptions` / `DocTemplate`，`Gb9704Backend` 仍专指通知后端。
 - CLI 的 `--report` / `--report-md` 改为可选：只有显式给出路径时才写出 JSON / Markdown 报告，缺省只生成 docx；同时不再在标准输出中打印未生成的报告路径。
 - Typst 元数据入口从 YAML front matter 改为主文件顶部的 `#let charta-meta = (...)` 字典字面量；`#let` 在 Typst 编译时没有输出，源文件可直接由 Typst 编译。旧写法会报告 `unsupported_syntax` 并跳过，提示迁移。
@@ -27,7 +28,9 @@
 
 ### Added
 
-- 新增 `skills/charta/SKILL.md`：给 AI 助手的仓库开发技能，涵盖结构、命令、样式与后端约定、渲染核验和交付流程。
+- `charta-docx-kit` 的 `Indent` 新增 `right_twips`，与 `right_chars` 一起输出 `w:right` / `w:rightChars`；`ParagraphFormatting` 新增 `word_wrap`，输出 `w:wordWrap`。Word 清零字符单位缩进、或让右对齐段的行尾空格参与排版时，分别需要这两组属性。
+- 通知的红头（发文机关标志）固定 36 pt 字高，机关名称超出版心宽度时按比例做字符缩放（`w:w`），保持单行不折行；`charta-docx-kit` 的 `RunProperties` 新增 `character_scale`。
+- 新增 `skills/charta/SKILL.md`：给 AI 助手的使用技能，涵盖 CLI 命令、后端选择、元数据与输入约定、交付检查。
 - 新增 `charta reference` 子命令与 `DocStyles::pandoc_reference_docx()`：把样式数据映射为 pandoc 内置样式 ID（`Title`、`Author`、`Date`、`BodyText`、`Heading1`–`3`、`BlockText`、`TableCaption`、`ImageCaption`、`TOCHeading`）并生成 `reference.docx`；另从正文、署名和三级标题派生 `FirstParagraph`、`Compact`、`Date`、`Heading4`–`9`。无对应角色的样式保留原 ID，`--styles` 补丁先生效再映射。
 - 列表嵌套超过四级时产生 `list_nesting_flattened` 渲染告警。
 - 有序列表的 `start` 现在用于起始序号，不再忽略。

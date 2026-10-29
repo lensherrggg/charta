@@ -93,6 +93,12 @@ pub(crate) fn paragraph_properties_xml(
         }
         inner.push_str("</w:tabs>");
     }
+    if let Some(word_wrap) = formatting.word_wrap {
+        inner.push_str(&format!(
+            "<w:wordWrap w:val=\"{}\"/>",
+            if word_wrap { 1 } else { 0 }
+        ));
+    }
     let spacing = spacing_xml(&formatting.spacing);
     if !spacing.is_empty() {
         inner.push_str(&spacing);
@@ -166,6 +172,9 @@ fn indent_xml(indent: &Indent) -> String {
             " w:rightChars=\"{}\"",
             (chars * 100.0).round() as i32
         ));
+    }
+    if let Some(twips) = indent.right_twips {
+        attrs.push_str(&format!(" w:right=\"{twips}\""));
     }
     if let Some(chars) = indent.first_line_chars {
         attrs.push_str(&format!(
@@ -264,6 +273,9 @@ pub(crate) fn run_properties_xml(properties: &RunProperties) -> String {
     if let Some(spacing) = properties.spacing_twips {
         inner.push_str(&format!("<w:spacing w:val=\"{spacing}\"/>"));
     }
+    if let Some(scale) = properties.character_scale {
+        inner.push_str(&format!("<w:w w:val=\"{}\"/>", scale.clamp(1, 600)));
+    }
     if let Some(size) = properties.size_half_points {
         inner.push_str(&format!(
             "<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/>"
@@ -299,5 +311,37 @@ mod tests {
         let xml = paragraph_properties_xml(&formatting, true);
         assert!(xml.contains("w:line=\"560\""));
         assert!(xml.contains("w:lineRule=\"exact\""));
+    }
+
+    #[test]
+    fn writes_character_scaling() {
+        let properties = RunProperties::default().character_scale(86);
+        let xml = run_properties_xml(&properties);
+        assert!(xml.contains("<w:w w:val=\"86\"/>"));
+    }
+
+    #[test]
+    fn writes_word_wrap_off() {
+        let formatting = ParagraphFormatting {
+            word_wrap: Some(false),
+            ..ParagraphFormatting::default()
+        };
+        let xml = paragraph_properties_xml(&formatting, true);
+        assert!(xml.contains("<w:wordWrap w:val=\"0\"/>"));
+    }
+
+    #[test]
+    fn writes_right_indent_in_chars_and_twips() {
+        let formatting = ParagraphFormatting {
+            indent: Indent {
+                right_chars: Some(0.0),
+                right_twips: Some(0),
+                ..Indent::default()
+            },
+            ..ParagraphFormatting::default()
+        };
+        let xml = paragraph_properties_xml(&formatting, true);
+        assert!(xml.contains("w:rightChars=\"0\""));
+        assert!(xml.contains("w:right=\"0\""));
     }
 }

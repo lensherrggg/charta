@@ -74,16 +74,8 @@ pub(crate) fn render_main(
     let issuer = string_field(metadata, "issuer").unwrap_or_default();
     let date = string_field(metadata, "date").unwrap_or_default();
     docx.add_paragraph(Paragraph::styled(STYLE_BODY));
-    docx.add_paragraph(plain_paragraph(
-        issuer,
-        STYLE_ISSUER,
-        styles.run(STYLE_ISSUER),
-    ));
-    docx.add_paragraph(plain_paragraph(
-        &chinese_date(date),
-        STYLE_DATE,
-        styles.run(STYLE_DATE),
-    ));
+    docx.add_paragraph(signature_paragraph(issuer, STYLE_ISSUER, styles));
+    docx.add_paragraph(signature_paragraph(&chinese_date(date), STYLE_DATE, styles));
 
     if let Some(note) = string_field(metadata, "note") {
         docx.add_paragraph(plain_paragraph(
@@ -92,6 +84,26 @@ pub(crate) fn render_main(
             styles.run(STYLE_NOTE),
         ));
     }
+}
+
+/// 落款偏移写进行尾空格而不是段右缩进，打开 docx 后增删空格即可左右微调；
+/// 仿宋 16 pt 下 4 个普通空格约等于一个全角字宽。普通空格默认会被 Word 当行尾
+/// 空白忽略，所以同时写 `wordWrap=0`，Word 与 WPS 都会把它计入行宽。
+const SPACES_PER_CHAR: f32 = 4.0;
+
+fn signature_paragraph(text: &str, style_id: &str, styles: &DocStyles) -> Paragraph {
+    let chars = styles.indent(style_id).right_chars;
+    let spaces = chars
+        .map(|chars| (chars * SPACES_PER_CHAR).round().max(0.0) as usize)
+        .unwrap_or(0);
+    let padded = format!("{text}{}", " ".repeat(spaces));
+    let mut paragraph = plain_paragraph(&padded, style_id, styles.run(style_id));
+    if chars.is_some() {
+        paragraph.formatting.indent.right_chars = Some(0.0);
+        paragraph.formatting.indent.right_twips = Some(0);
+        paragraph.formatting.word_wrap = Some(false);
+    }
+    paragraph
 }
 
 pub(crate) fn render_general(

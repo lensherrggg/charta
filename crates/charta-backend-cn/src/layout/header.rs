@@ -29,15 +29,35 @@ pub(crate) fn render(docx: &mut Docx, metadata: &Metadata, styles: &DocStyles) {
         .unwrap_or_default();
     let doc_number = string_field(metadata, "doc_number").unwrap_or_default();
 
-    docx.add_paragraph(plain_paragraph(
-        organization,
-        STYLE_ORG_MARK,
-        styles.run(STYLE_ORG_MARK),
-    ));
+    let mut organization_paragraph =
+        plain_paragraph(organization, STYLE_ORG_MARK, styles.run(STYLE_ORG_MARK));
+    if let Some(scale) = organization_scale(organization, styles) {
+        for run in &mut organization_paragraph.runs {
+            run.properties.character_scale = Some(scale);
+        }
+    }
+    docx.add_paragraph(organization_paragraph);
     docx.add_paragraph(plain_paragraph(
         doc_number,
         STYLE_DOC_NUMBER,
         styles.run(STYLE_DOC_NUMBER),
     ));
     docx.add_paragraph(Paragraph::styled(STYLE_RED_LINE));
+}
+
+/// The red header keeps its 36 pt height; names wider than the text column are
+/// narrowed horizontally (Word's 字符缩放) so they stay on one line.
+fn organization_scale(text: &str, styles: &DocStyles) -> Option<u32> {
+    let size_pt = styles.run(STYLE_ORG_MARK).size_pt;
+    let text_width_mm = styles.page().setup().text_width_mm();
+    let em_mm = size_pt * 25.4 / 72.0;
+    let natural_mm: f32 = text
+        .chars()
+        .map(|ch| if ch.is_ascii() { em_mm * 0.55 } else { em_mm })
+        .sum();
+    if natural_mm <= text_width_mm || natural_mm <= 0.0 {
+        return None;
+    }
+    let percent = (text_width_mm / natural_mm * 100.0).floor();
+    Some((percent as u32).clamp(1, 100))
 }

@@ -217,6 +217,9 @@ pub struct ParagraphFormatting {
     pub page_break_before: bool,
     /// Zero-based Word outline level (0 = Heading 1).
     pub outline_level: Option<u8>,
+    /// Word's `w:wordWrap`: `false` disables character-level line breaking and
+    /// makes trailing spaces count in right-aligned paragraphs.
+    pub word_wrap: Option<bool>,
     pub tabs: Vec<TabStop>,
 }
 
@@ -340,6 +343,9 @@ pub enum LineSpacing {
 pub struct Indent {
     pub left_chars: Option<f32>,
     pub right_chars: Option<f32>,
+    /// Right indent in twips. Word needs this alongside `right_chars` when the
+    /// char-unit value is reset to zero.
+    pub right_twips: Option<i32>,
     pub first_line_chars: Option<f32>,
     pub first_line_twips: Option<i32>,
     pub hanging_chars: Option<f32>,
@@ -487,6 +493,8 @@ pub struct RunProperties {
     pub underline: bool,
     pub color: Option<[u8; 3]>,
     pub spacing_twips: Option<i32>,
+    /// Horizontal character scaling in percent (Word's 字符缩放).
+    pub character_scale: Option<u32>,
 }
 
 impl RunProperties {
@@ -537,6 +545,12 @@ impl RunProperties {
 
     pub fn spacing_twips(mut self, twips: i32) -> Self {
         self.spacing_twips = Some(twips);
+        self
+    }
+
+    /// Word's 字符缩放: keep the font size and narrow the glyphs horizontally.
+    pub fn character_scale(mut self, percent: u32) -> Self {
+        self.character_scale = Some(percent.clamp(1, 600));
         self
     }
 }

@@ -237,6 +237,24 @@ fn renders_complete_notice() {
     )));
 }
 
+#[test]
+fn signature_offset_uses_trailing_spaces() {
+    let document = document();
+    let output = Gb9704Backend::new()
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let body = part(&output.docx, "word/document.xml");
+    let issuer = format!("昆山市人民政府{}", " ".repeat(16));
+    let date = format!("2026年10月25日{}", " ".repeat(8));
+    assert!(body.contains(&issuer));
+    assert!(body.contains(&date));
+    assert!(body.contains("<w:ind w:rightChars=\"0\" w:right=\"0\"/>"));
+    assert!(body.contains("<w:wordWrap w:val=\"0\"/>"));
+}
+
 const PNG_1X1: &[u8] = &[
     0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
     0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
@@ -244,6 +262,35 @@ const PNG_1X1: &[u8] = &[
     0x0F, 0x00, 0x05, 0x83, 0x02, 0x7F, 0x94, 0xAD, 0xD0, 0xEB, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
     0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
 ];
+
+#[test]
+fn red_header_narrows_long_organization_names() {
+    let mut metadata = metadata();
+    metadata.insert("organization", "中国共产党昆山市委员会文件");
+    let document = Document::new(FrontendId::Markdown, metadata);
+    let output = Gb9704Backend::new()
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let body = part(&output.docx, "word/document.xml");
+    // 13 个全角字 × 36 pt = 165.1 mm，版心 156 mm → 94%。
+    assert!(body.contains("<w:w w:val=\"94\"/>"));
+    assert!(body.contains("w:sz w:val=\"72\""));
+
+    let mut metadata = self::metadata();
+    metadata.insert("organization", "昆山市人民政府文件");
+    let document = Document::new(FrontendId::Markdown, metadata);
+    let output = Gb9704Backend::new()
+        .render(RenderRequest {
+            document: &document,
+            metadata: &document.metadata,
+        })
+        .unwrap();
+    let body = part(&output.docx, "word/document.xml");
+    assert!(!body.contains("<w:w "));
+}
 
 #[test]
 fn embeds_images_into_the_package() {

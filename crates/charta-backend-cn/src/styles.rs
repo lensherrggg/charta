@@ -327,6 +327,13 @@ impl DocStyles {
         self.styles.get(id).and_then(|style| style.run.as_ref())
     }
 
+    pub(crate) fn indent(&self, id: &str) -> Indent {
+        self.styles
+            .get(id)
+            .map(|style| style.paragraph.indent)
+            .unwrap_or_default()
+    }
+
     pub(crate) fn stylesheet(&self) -> Stylesheet {
         let mut sheet = Stylesheet {
             default_font: Some(self.defaults.ascii_font.clone()),

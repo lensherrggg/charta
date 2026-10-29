@@ -62,6 +62,8 @@ cargo run -p charta-cli -- convert examples/notice.md --backend gb9704 \
   --report-md out/notice.report.md
 ```
 
+通知的署名和日期右空由样式数据 `GbIssuer` / `GbDate` 的 `right_chars` 换算成行尾普通空格写入正文（16 pt 下 1 字 = 4 个空格），段右缩进为零并关闭 `wordWrap`，Word/WPS 才会把行尾空格计入行宽。生成后可直接在 Word 里增删落款末尾的空格调整左右位置：删 4 个右移 1 字，加 4 个左移 1 字。不要用全角空格；普通空格能生效是因为段落带了 `wordWrap=0`，复制文本到别的文档后该属性会丢失。
+
 ### 转换 Markdown 通用材料（默认后端）
 
 ```bash
@@ -403,6 +405,8 @@ Typst 表格只接受字面量子集：`columns` 为整数或元组（元组只�
 通知属于下行文，不接受 `signer`；若元数据中仍提供，会报告 `metadata_ignored` 且不渲染。上行文的签发人口径留到请示/报告后端。
 
 关闭版头后 `doc_number` 不再必填；`doc_number`、`copy_number`、`security_level`、`urgency` 若仍提供会报告 `metadata_ignored`。关闭版记后 `cc`、`issuing_office`、`issuing_date` 同理。
+
+发文机关标志固定 36 pt 字高；机关名称超过版心宽度时按比例压窄字宽（Word 字符缩放），保持单行、不折行，字高始终不变。
 
 元数据入口按前端区分：
 
